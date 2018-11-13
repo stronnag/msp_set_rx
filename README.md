@@ -12,9 +12,13 @@ Well it does, if you do it right. This example demonstrates usage.
 
 ## Prerequisites
 ```
-feature RX_MSP
 map AERT
-set receiver_type = MSP
+
+# for older firmware
+feature RX_MSP              
+
+# iNav 2.0 (at least)
+set receiver_type = MSP     
 ```
 
 ## Building
