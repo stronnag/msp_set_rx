@@ -21,8 +21,6 @@ feature RX_MSP
 set receiver_type = MSP     
 ```
 
-The vehicle must be in a state that will allow arming: [iNav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
-
 ## Building
 
 * Clone this repostitory
@@ -68,6 +66,8 @@ The application can also test arm / disarm, with the `-a` option. In this mode, 
 * Arms using the customary stick command
 * Maintains min-throttle for two minutes
 * Disarms (stick command)
+
+The vehicle must be in a state that will allow arming: [iNav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
 
 Summary of output (`##` indicates a comment, repeated lines removed).
 
