@@ -19,7 +19,7 @@ set receiver_type = MSP
 
 ## Building
 
-* Uncompress the tar file (it ends up in a directory `msp_set_rx`)
+* Clone this repostitory
 * If you haven't previously go got `tarm/serial` then do that:
 
  ```
