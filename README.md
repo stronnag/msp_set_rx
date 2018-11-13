@@ -36,6 +36,16 @@ This should result in a `msp_set_rx` application.
 
 ## Usage
 
+```
+$ ./msp_set_rx --help
+Usage of msp_set_rx [options]
+  -a	Arm (take care now)
+  -b int
+    	Baud rate (default 115200)
+  -d string
+    	Serial Device
+```
+
 Sets random (but safe) values:
 
 ```
