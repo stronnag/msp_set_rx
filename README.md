@@ -14,10 +14,10 @@ Well it does, if you do it right. This example demonstrates usage.
 ```
 map AERT
 
-# for older firmware
+# for ancient firmware
 feature RX_MSP              
 
-# iNav 2.0 (at least)
+# iNav 1.8 and later
 set receiver_type = MSP     
 ```
 
