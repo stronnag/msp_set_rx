@@ -6,7 +6,7 @@ This golang program exercises `MSP SET_RAW_RC`.
 
 ### Why
 
-Every few months, someone will come along on iNav github / RC Groups / Slack / some other random support channel and state that RX_MSP doesn't work.
+Every few months, someone will come along on iNav github / RC Groups / Telegram / some other random support channel and state that RX_MSP doesn't work.
 
 Well it does, if you do it right. This example demonstrates usage.
 
@@ -21,9 +21,13 @@ feature RX_MSP
 set receiver_type = MSP
 ```
 
+Update RX data at 5Hz or better. 
+
+Consider also (post iNav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode.
+
 ## Building
 
-* Clone this repostitory
+* Clone this repository
 * If you haven't previously go got `tarm/serial` then do that:
 
  ```
