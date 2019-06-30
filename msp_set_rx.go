@@ -28,7 +28,7 @@ type DevDescription  struct {
 var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
-	arm = flag.Bool("a", false, "Arm (take care now)")
+	arm = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
 )
 
 func check_device() DevDescription {
