@@ -2,11 +2,11 @@
 
 ## Overview
 
-This golang program exercises `MSP SET_RAW_RC`. 
+This golang program exercises `MSP SET_RAW_RC`.
 
 ### Why
 
-Every few months, someone will come along on iNav github / RC Groups / Slack / some other random support channel and state that RX_MSP doesn't work. 
+Every few months, someone will come along on iNav github / RC Groups / Slack / some other random support channel and state that RX_MSP doesn't work.
 
 Well it does, if you do it right. This example demonstrates usage.
 
@@ -15,10 +15,10 @@ Well it does, if you do it right. This example demonstrates usage.
 map AERT
 
 # for ancient firmware
-feature RX_MSP              
+feature RX_MSP
 
 # iNav 1.8 and later
-set receiver_type = MSP     
+set receiver_type = MSP
 ```
 
 ## Building
@@ -43,7 +43,7 @@ This should result in a `msp_set_rx` application.
 ```
 $ ./msp_set_rx --help
 Usage of msp_set_rx [options]
-  -a	Arm (take care now)
+  -a	Arm (take care now) [only iNav versions supporting stick arming]
   -b int
     	Baud rate (default 115200)
   -d string
@@ -60,7 +60,7 @@ C:\> msp_set_rx.exe -d COM42 -b 115200
 
 ### Arm / Disarm test
 
-The application can also test arm / disarm, with the `-a` option. In this mode, the application:
+The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming). In this mode, the application:
 
 * Sets a quiescent state for 30 seconds
 * Arms using the customary stick command
