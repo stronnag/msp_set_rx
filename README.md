@@ -68,12 +68,12 @@ C:\> msp_set_rx.exe -d COM42 -b 115200
 
 ### Arm / Disarm test
 
-The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming) (or -A n for switch arming). In this mode, the application:
+The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming) (or `-A n` for switch arming). In this mode, the application:
 
 * Sets a quiescent state for 30 seconds
-* Arms using the customary stick command
+* Arms using the customary stick or switch command
 * Maintains min-throttle for two minutes
-* Disarms (stick command)
+* Disarms (stick or switch command)
 
 The vehicle must be in a state that will allow arming: [iNav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
 
@@ -105,7 +105,6 @@ Rx: [1500 1500 1500 1000 1017 1442 1605 1669] Quiescent
 ```
 
 While this attempts to arm at a safe throttle value, removing props or using a current limiter is recommended.
-
 
 ## Licence
 
