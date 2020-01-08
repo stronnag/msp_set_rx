@@ -293,8 +293,21 @@ func MSPInit(dd DevDescription) *MSPSerial {
 	return m
 }
 
-func serialise_rx(phase int8) ([]byte) {
+func serialise_rx(phase int8, sarm int) ([]byte) {
 	buf := make([]byte, 16)
+	var aoff = int(0);
+	if sarm > 4 && sarm < 9 {
+		aoff = (sarm-1)*2;
+	}
+
+	binary.LittleEndian.PutUint16(buf[8:10], uint16(1017))
+	binary.LittleEndian.PutUint16(buf[10:12], uint16(1442))
+	binary.LittleEndian.PutUint16(buf[12:14], uint16(1605))
+	binary.LittleEndian.PutUint16(buf[14:16], uint16(1669))
+	if aoff != 0 {
+		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1001))
+	}
+
 	switch phase {
 	case 0:
 		n := rand.Intn(rx_RAND)
@@ -310,26 +323,36 @@ func serialise_rx(phase int8) ([]byte) {
 		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+
 	case 2:
 		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[4:6], uint16(2000))
+		if sarm == 0 {
+			binary.LittleEndian.PutUint16(buf[4:6], uint16(2000))
+		} else {
+			binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
+			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
+		}
 		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
 	case 3:
 		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+		if aoff != 0 {
+			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
+		}
 	case 4:
 		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[4:6], uint16(1000))
+		if sarm == 0 {
+			binary.LittleEndian.PutUint16(buf[4:6], uint16(1000))
+		} else {
+			binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
+			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1000))
+		}
 		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
 	}
-	binary.LittleEndian.PutUint16(buf[8:10], uint16(1017))
-	binary.LittleEndian.PutUint16(buf[10:12], uint16(1442))
-	binary.LittleEndian.PutUint16(buf[12:14], uint16(1605))
-	binary.LittleEndian.PutUint16(buf[14:16], uint16(1669))
 	return buf
 }
 
@@ -343,9 +366,14 @@ func deserialise_rx(b []byte) ([]int16) {
 	return buf
 }
 
-func (m *MSPSerial) test_rx(arm bool) () {
+func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 	cnt := 0
 	var phase = int8(0)
+
+	if sarm != 0 {
+		arm = true;
+	}
+
 	for ;; {
 		if arm {
 			if cnt <= 300 || cnt > 1510 {
@@ -360,7 +388,7 @@ func (m *MSPSerial) test_rx(arm bool) () {
 				phase = 0
 			}
 		}
-		tdata := serialise_rx(phase);
+		tdata := serialise_rx(phase, sarm);
 		m.Send_msp(msp_SET_RAW_RC, tdata)
 		_, _, err := m.Read_cmd(msp_SET_RAW_RC)
 		if err == nil {
@@ -370,7 +398,7 @@ func (m *MSPSerial) test_rx(arm bool) () {
 				txdata := deserialise_rx(tdata)
 				fmt.Printf("Tx: %v\n", txdata)
 				rxdata := deserialise_rx(payload)
-				fmt.Printf("Rx: %v", rxdata)
+				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
 				switch phase {
 				case 0:
 					fmt.Printf("\n");

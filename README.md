@@ -21,7 +21,7 @@ feature RX_MSP
 set receiver_type = MSP
 ```
 
-Update RX data at 5Hz or better. 
+Update RX data at 5Hz or better.
 
 Consider also (post iNav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode.
 
@@ -47,6 +47,8 @@ This should result in a `msp_set_rx` application.
 ```
 $ ./msp_set_rx --help
 Usage of msp_set_rx [options]
+  -A int
+    	Arm Switch, (5-8), assumes 2000us will arm
   -a	Arm (take care now) [only iNav versions supporting stick arming]
   -b int
     	Baud rate (default 115200)
@@ -60,11 +62,13 @@ Sets random (but safe) values:
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 # and hence, probably, for example
 C:\> msp_set_rx.exe -d COM42 -b 115200
+# Arm on switch 5 (set range as 1800-2100 in CLI/configurator)
+# ./msp_set_rx -A 5 -d /dev/ttyACM0
 ```
 
 ### Arm / Disarm test
 
-The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming). In this mode, the application:
+The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming) (or -A n for switch arming). In this mode, the application:
 
 * Sets a quiescent state for 30 seconds
 * Arms using the customary stick command

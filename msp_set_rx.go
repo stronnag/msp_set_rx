@@ -29,6 +29,7 @@ var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
 	arm = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
+	sarm = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
 )
 
 func check_device() DevDescription {
@@ -88,5 +89,5 @@ func main() {
 
 	devdesc := check_device()
 	s := MSPInit(devdesc)
-	s.test_rx(*arm);
+	s.test_rx(*arm, *sarm);
 }
