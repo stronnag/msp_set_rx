@@ -35,6 +35,15 @@ const (
 	state_CMD
 	state_DATA
 	state_CRC
+
+	state_X_HEADER2
+  state_X_FLAGS
+  state_X_ID1
+  state_X_ID2
+  state_X_LEN1
+  state_X_LEN2
+  state_X_DATA
+  state_X_CHECKSUM
 )
 
 type MSPSerial struct {
@@ -42,6 +51,43 @@ type MSPSerial struct {
 	p *serial.Port
 	conn net.Conn
 	reader *bufio.Reader
+	usev2 bool
+}
+
+func crc8_dvb_s2(crc byte, a byte) byte {
+	crc ^= a
+  for  i:= 0; i < 8; i++ {
+    if (crc & 0x80) != 0 {
+			crc = (crc << 1) ^ 0xd5
+		} else {
+      crc = crc << 1
+    }
+	}
+  return crc
+}
+
+// In this example, cmd can be a byte, really its int16
+func encode_msp2(cmd byte, payload []byte) []byte {
+	var paylen int16
+	if len(payload) > 0 {
+		paylen = int16(len(payload))
+	}
+	buf := make([]byte, 9+paylen)
+	buf[0] = '$'
+	buf[1] = 'X'
+	buf[2] = '<'
+	buf[3] = 0 // flags
+	binary.LittleEndian.PutUint16(buf[4:6], uint16(cmd))
+	binary.LittleEndian.PutUint16(buf[6:8], uint16(paylen))
+	if paylen > 0 {
+		copy(buf[8:], payload)
+	}
+	crc := byte(0)
+	for _, b := range buf[3:paylen+8] {
+		crc = crc8_dvb_s2(crc, b)
+	}
+	buf[8+paylen] = crc
+	return buf
 }
 
 func encode_msp(cmd byte, payload []byte) []byte {
@@ -90,6 +136,10 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 	var len = byte(0)
 	var crc = byte(0)
 	var cmd = byte(0)
+	var xlen = int16(0)
+	var xcmd = int16(0)
+	var xcount = int16(0)
+
 	ok := true
 	done := false
 	var buf []byte
@@ -107,6 +157,8 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_M:
 				if inp[0] == 'M' {
 					n = state_DIRN
+				} else if inp[0] == 'X'{
+					n = state_X_HEADER2
 				} else {
 					n = state_INIT
 				}
@@ -119,6 +171,61 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 				} else {
 					n = state_INIT
 				}
+
+			case state_X_HEADER2:
+				if inp[0] == '!' {
+					n = state_X_FLAGS
+					ok = false
+				} else if inp[0] == '>' {
+					n = state_X_FLAGS
+				} else {
+					n = state_INIT
+				}
+
+			case state_X_FLAGS:
+				crc = crc8_dvb_s2(0, inp[0])
+				n = state_X_ID1
+
+			case state_X_ID1:
+				crc = crc8_dvb_s2(crc, inp[0])
+				xcmd = int16(inp[0]);
+				cmd = inp[0]
+				n = state_X_ID2
+
+			case state_X_ID2:
+				crc = crc8_dvb_s2(crc, inp[0])
+				xcmd |= (int16(inp[0])<<8);
+				n = state_X_LEN1
+
+			case state_X_LEN1:
+				crc = crc8_dvb_s2(crc, inp[0])
+				xlen = int16(inp[0])
+				n = state_X_LEN2
+
+			case state_X_LEN2:
+				crc = crc8_dvb_s2(crc, inp[0])
+				xlen |= (int16(inp[0])<<8);
+				buf = make([]byte, xlen)
+				if xlen > 0 {
+					n = state_X_DATA
+				} else {
+					n = state_X_CHECKSUM
+				}
+			case state_X_DATA:
+				crc = crc8_dvb_s2(crc, inp[0])
+				buf[xcount] = inp[0]
+				xcount++
+				if xcount == xlen {
+					n = state_X_CHECKSUM
+				}
+
+			case state_X_CHECKSUM:
+				ccrc := inp[0]
+				if crc != ccrc {
+					ok = false
+				}
+				done = true
+
 			case state_LEN:
 				len = inp[0]
 				buf = make([]byte, len)
@@ -221,13 +328,19 @@ func NewMSPUDP(dd DevDescription) *MSPSerial {
 }
 
 func (m *MSPSerial) Send_msp(cmd byte, payload []byte) {
-	buf := encode_msp(cmd, payload)
+	var buf []byte
+	if m.usev2 {
+		buf = encode_msp2(cmd, payload)
+	} else {
+		buf = encode_msp(cmd, payload)
+	}
 	m.write(buf)
 }
 
-func MSPInit(dd DevDescription) *MSPSerial {
+func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	var fw, api, vers, board, gitrev string
 	var m *MSPSerial
+
 	switch dd.klass {
 		case DevClass_SERIAL:
 		m = NewMSPSerial(dd)
@@ -235,11 +348,11 @@ func MSPInit(dd DevDescription) *MSPSerial {
 		m = NewMSPTCP(dd)
 	case DevClass_UDP:
 		m = NewMSPUDP(dd)
-   default:
+  default:
 		fmt.Fprintln(os.Stderr, "Unsupported device")
 		os.Exit(1)
 	}
-
+	m.usev2 = _usev2
 	m.Send_msp(msp_API_VERSION, nil)
 	_, payload, err := m.Read_cmd(msp_API_VERSION)
 	if err != nil {
