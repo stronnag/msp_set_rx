@@ -47,6 +47,7 @@ This should result in a `msp_set_rx` application.
 ```
 $ ./msp_set_rx --help
 Usage of msp_set_rx [options]
+  -2	Use MSPv2
   -A int
     	Arm Switch, (5-8), assumes 2000us will arm
   -a	Arm (take care now) [only iNav versions supporting stick arming]
@@ -64,6 +65,7 @@ $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 C:\> msp_set_rx.exe -d COM42 -b 115200
 # Arm on switch 5 (set range as 1800-2100 in CLI/configurator)
 # ./msp_set_rx -A 5 -d /dev/ttyACM0
+# ./msp_set_rx -2 -A 5 -d /dev/ttyACM0
 ```
 
 ### Arm / Disarm test
