@@ -140,14 +140,15 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 	var xcmd = int16(0)
 	var xcount = int16(0)
 
-	ok := true
+	ok := byte(0)
 	done := false
 	var buf []byte
+	var err error
 
 	n := state_INIT
 
 	for !done {
-		_, err := m.read(inp)
+		_, err = m.read(inp)
 		if err == nil {
 			switch n {
 			case state_INIT:
@@ -165,7 +166,7 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_DIRN:
 				if inp[0] == '!' {
 					n = state_LEN
-					ok = false
+					ok = 1
 				} else if inp[0] == '>' {
 					n = state_LEN
 				} else {
@@ -175,7 +176,7 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_X_HEADER2:
 				if inp[0] == '!' {
 					n = state_X_FLAGS
-					ok = false
+					ok = 1
 				} else if inp[0] == '>' {
 					n = state_X_FLAGS
 				} else {
@@ -222,7 +223,7 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_X_CHECKSUM:
 				ccrc := inp[0]
 				if crc != ccrc {
-					ok = false
+					ok = 2
 				}
 				done = true
 
@@ -249,14 +250,22 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_CRC:
 				ccrc := inp[0]
 				if crc != ccrc {
-					ok = false
+					ok = 2
 				}
 				done = true
 			}
+		} else {
+			done = true
 		}
 	}
-	if !ok {
-		return 0, nil, errors.New("MSP error")
+	if ok != 0  {
+		switch ok {
+		case 1:
+			err = errors.New("MSP unrecognised")
+		case 2:
+			err = errors.New("MSP CRC")
+		}
+		return cmd, nil, err
 	} else {
 		return cmd, buf, nil
 	}
@@ -267,10 +276,10 @@ func (m *MSPSerial) Read_cmd(cmd byte) (byte, []byte, error) {
 	var err error
 	var c = byte(0)
 
-	for ; c != cmd && err ==nil ; {
+	for ; c != cmd ; {
 		c,buf,err = m.Read_msp()
-		if c != cmd {
-			fmt.Printf("Unsolicted %v (wanted %v)\n", c, cmd)
+		if c != cmd || err != nil {
+			fmt.Printf("Received cmd %v (wanted %v) err=%v\n", c, cmd, err)
 		}
 	}
 	return c,buf,err
@@ -525,8 +534,10 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 					fmt.Printf(" Dis-arming\n");
 				}
 			} else {
+				log.Fatalf("MSP_SET_RAW_RC - %v\n", err)
 			}
 		} else {
+			log.Fatalf("MSP_RC - %v\n", err)
 		}
 		time.Sleep(100 * time.Millisecond)
 		cnt++

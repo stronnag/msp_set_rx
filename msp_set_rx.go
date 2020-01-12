@@ -48,7 +48,7 @@ func check_device() DevDescription {
 	if devdesc.name == "" && devdesc.param == 0 {
 		log.Fatalln("No device given\n")
 	} else {
-		log.Printf("Using device %s\n", *device)
+		log.Printf("Using device %s\n", devdesc.name)
 	}
 	return devdesc
 }
