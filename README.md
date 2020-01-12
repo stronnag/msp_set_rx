@@ -14,15 +14,15 @@ As Go is available on pretty much any OS, you can easily verify that it works.
 
 ## FC Prerequisites
 
-A supported FC (i.e. not F1 ...)
+A supported FC
 
 ```
-map AERT
-
 # for ancient firmware
+map AERT5678
 feature RX_MSP
 
-# iNav 1.8 and later
+# Modern firmware (e.g iNav 1.8 and later)
+map AERT
 set receiver_type = MSP
 ```
 
@@ -70,7 +70,7 @@ $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 C:\> msp_set_rx.exe -d COM42 -b 115200
 # Arm on switch 5 (set range as 1800-2100 in CLI/configurator)
 $ ./msp_set_rx -A 5 -d /dev/ttyACM0
-# MSPv2 
+# MSPv2
 $ ./msp_set_rx -2 -A 5 -d /dev/ttyACM0
 ```
 
@@ -148,6 +148,33 @@ Tx: [1500 1500 1500 1000 1017 1442 1605 1669]
 Rx: [1500 1500 1500 1000 1017 1442 1605 1669] Quiescent
 ```
 
+Even ancient F1 (patched for RX_MSP)
+
+```
+$ ./msp_set_rx -A 5
+2020/01/12 11:00:01 Using device /dev/ttyACM0
+INAV v1.7.3 CC3D (772e015f) API 2.0
+...
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00300) unarmed Quiescent
+Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00301) unarmed Arming
+Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00302) armed Arming
+...
+Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00311) armed Min throttle
+...
+Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (01500) armed Min throttle
+Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01501) armed Dis-arming
+Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01502) armed Dis-arming
+Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01503) unarmed Dis-arming
+...
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (01511) unarmed Quiescent
+```
 
 While this attempts to arm at a safe throttle value, removing props or using a current limiter is recommended.
 
@@ -156,6 +183,8 @@ While this attempts to arm at a safe throttle value, removing props or using a c
 * Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and the ignore responses.
 * Esnure you're set the correct AUX range to arm
 * Ensure you've met the required arming conditions
+* Correct `map` for you FC version (4 character, 8 character etc.)
+* For F1, no other `RX_xxx` feature set.
 * Use a supported FC
 
 ## Licence

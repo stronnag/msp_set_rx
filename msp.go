@@ -394,24 +394,30 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 		gitrev = string(payload[19:])
 	}
 
+	have_name := false
 	m.Send_msp(msp_BOARD_INFO, nil)
 	_, payload, err = m.Read_cmd(msp_BOARD_INFO)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
-		board = string(payload[9:])
+		if len(payload) > 8 {
+ 			board = string(payload[9:])
+			have_name = true
+		} else {
+ 			board = string(payload[0:4])
+		}
 	}
 
 	fmt.Fprintf(os.Stderr, "%s v%s %s (%s) API %s", fw, vers, board, gitrev, api)
+	if have_name {
+		m.Send_msp(msp_NAME, nil)
+		_, payload, err = m.Read_cmd(msp_NAME)
 
-	m.Send_msp(msp_NAME, nil)
-	_, payload, err = m.Read_cmd(msp_NAME)
-
-	if len(payload) > 0 {
-		fmt.Fprintf(os.Stderr, " \"%s\"\n", payload)
-	} else {
-		fmt.Fprintln(os.Stderr, "")
+		if len(payload) > 0 {
+			fmt.Fprintf(os.Stderr, " \"%s\"", payload)
+		}
 	}
+	fmt.Fprintln(os.Stderr, "\n")
 	return m
 }
 
