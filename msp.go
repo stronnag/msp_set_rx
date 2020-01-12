@@ -21,9 +21,9 @@ const (
 	msp_BUILD_INFO  = 5
 
 	msp_NAME        = 10
-
-	msp_SET_RAW_RC = 200
-  msp_RC         = 105
+	msp_STATUS      = 101
+	msp_SET_RAW_RC  = 200
+  msp_RC          = 105
 
 	rx_START = 1400
 	rx_RAND  =  200
@@ -521,6 +521,19 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 				fmt.Printf("Tx: %v\n", txdata)
 				rxdata := deserialise_rx(payload)
 				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
+				m.Send_msp(msp_STATUS, nil)
+				_, payload, err := m.Read_cmd(msp_STATUS)
+				if err == nil {
+					var status uint32
+					status = binary.LittleEndian.Uint32(payload[6:10])
+					if status & 1 == 1 {
+						fmt.Print(" armed")
+					} else {
+						fmt.Print(" unarmed")
+					}
+				} else {
+					log.Fatalf("MSP_STATUS - %v\n", err)
+				}
 				switch phase {
 				case 0:
 					fmt.Printf("\n");
