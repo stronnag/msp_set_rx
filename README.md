@@ -6,7 +6,7 @@ This golang program exercises `MSP SET_RAW_RC`.
 
 ### Why
 
-Every few months, someone will come along on iNav github / RC Groups / Telegram / some other random support channel and state that RX_MSP doesn't work.
+Every few months, someone will come along on inav github / RC Groups / Telegram / some other random support channel and state that RX_MSP doesn't work.
 
 Well it does, if you do it right. This example demonstrates usage.
 
@@ -21,14 +21,14 @@ A supported FC
 map AERT5678
 feature RX_MSP
 
-# Modern firmware (e.g iNav 1.8 and later)
+# Modern firmware (e.g inav 1.8 and later)
 map AERT
 set receiver_type = MSP
 ```
 
 Update RX data at 5Hz or better.
 
-Consider also (post iNav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode.
+Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` or `make TARGET=FOO OPTIONS=USE_MSP_RC_OVERRIDE=1 BUILD_SUFFIX=msp-override` and enabling the MSP RC override flight mode. It is also advisable to `make TARGET=FOO clean` when changing such defines.
 
 ## Building
 
@@ -55,7 +55,7 @@ Usage of msp_set_rx [options]
   -2	Use MSPv2
   -A int
     	Arm Switch, (5-8), assumes 2000us will arm
-  -a	Arm (take care now) [only iNav versions supporting stick arming]
+  -a	Arm (take care now) [only inav versions supporting stick arming]
   -b int
     	Baud rate (default 115200)
   -d string
@@ -78,14 +78,14 @@ Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
 
 ### Arm / Disarm test
 
-The application can also test arm / disarm, with the `-a` option (where the iNav versions supporting stick arming) (or `-A n` for switch arming). In this mode, the application:
+The application can also test arm / disarm, with the `-a` option (where the inav versions supporting stick arming) (or `-A n` for switch arming). In this mode, the application:
 
 * Sets a quiescent state for 30 seconds
 * Arms using the configured  (stick or switch) command
 * Maintains min-throttle (1000uS) for two minutes
 * Disarms (stick or switch command)
 
-The vehicle must be in a state that will allow arming: [iNav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
+The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
 
 Summary of output (`##` indicates a comment, repeated lines removed).
 
