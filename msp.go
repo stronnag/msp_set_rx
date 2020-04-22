@@ -25,7 +25,7 @@ const (
 	msp_SET_RAW_RC  = 200
   msp_RC          = 105
 	msp_STATUS_EX   = 150
-
+	msp2_INAV_STATUS = 0x2000
 	rx_START = 1400
 	rx_RAND  =  200
 
@@ -54,6 +54,7 @@ type MSPSerial struct {
 	reader *bufio.Reader
 	usev2 bool
 	vcapi uint16
+	fcvers uint32
 }
 
 func crc8_dvb_s2(crc byte, a byte) byte {
@@ -68,8 +69,7 @@ func crc8_dvb_s2(crc byte, a byte) byte {
   return crc
 }
 
-// In this example, cmd can be a byte, really its int16
-func encode_msp2(cmd byte, payload []byte) []byte {
+func encode_msp2(cmd uint16, payload []byte) []byte {
 	var paylen int16
 	if len(payload) > 0 {
 		paylen = int16(len(payload))
@@ -79,7 +79,7 @@ func encode_msp2(cmd byte, payload []byte) []byte {
 	buf[1] = 'X'
 	buf[2] = '<'
 	buf[3] = 0 // flags
-	binary.LittleEndian.PutUint16(buf[4:6], uint16(cmd))
+	binary.LittleEndian.PutUint16(buf[4:6], cmd)
 	binary.LittleEndian.PutUint16(buf[6:8], uint16(paylen))
 	if paylen > 0 {
 		copy(buf[8:], payload)
@@ -92,7 +92,7 @@ func encode_msp2(cmd byte, payload []byte) []byte {
 	return buf
 }
 
-func encode_msp(cmd byte, payload []byte) []byte {
+func encode_msp(cmd uint16, payload []byte) []byte {
 	var paylen byte
 	if len(payload) > 0 {
 		paylen = byte(len(payload))
@@ -102,7 +102,7 @@ func encode_msp(cmd byte, payload []byte) []byte {
 	buf[1] = 'M'
 	buf[2] = '<'
 	buf[3] = paylen
-	buf[4] = cmd
+	buf[4] = byte(cmd)
 	if paylen > 0 {
 		copy(buf[5:], payload)
 	}
@@ -132,14 +132,14 @@ func (m *MSPSerial) write(payload []byte) (int, error) {
 	}
 }
 
-func (m *MSPSerial) Read_msp() (byte, []byte, error) {
+func (m *MSPSerial) Read_msp() (uint16, []byte, error) {
 	inp := make([]byte, 1)
 	var count = byte(0)
 	var len = byte(0)
 	var crc = byte(0)
 	var cmd = byte(0)
 	var xlen = int16(0)
-	var xcmd = int16(0)
+	var xcmd = uint16(0)
 	var xcount = int16(0)
 
 	ok := byte(0)
@@ -191,13 +191,13 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 
 			case state_X_ID1:
 				crc = crc8_dvb_s2(crc, inp[0])
-				xcmd = int16(inp[0]);
+				xcmd = uint16(inp[0]);
 				cmd = inp[0]
 				n = state_X_ID2
 
 			case state_X_ID2:
 				crc = crc8_dvb_s2(crc, inp[0])
-				xcmd |= (int16(inp[0])<<8);
+				xcmd |= (uint16(inp[0])<<8);
 				n = state_X_LEN1
 
 			case state_X_LEN1:
@@ -237,6 +237,7 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 			case state_CMD:
 				cmd = inp[0]
 				crc ^= cmd
+				xcmd = uint16(cmd)
 				if len == 0 {
 					n = state_CRC
 				} else {
@@ -267,16 +268,16 @@ func (m *MSPSerial) Read_msp() (byte, []byte, error) {
 		case 2:
 			err = errors.New("MSP CRC")
 		}
-		return cmd, nil, err
+		return xcmd, nil, err
 	} else {
-		return cmd, buf, nil
+		return xcmd, buf, nil
 	}
 }
 
-func (m *MSPSerial) Read_cmd(cmd byte) (byte, []byte, error) {
+func (m *MSPSerial) Read_cmd(cmd uint16) (uint16, []byte, error) {
 	var buf []byte
 	var err error
-	var c = byte(0)
+	var c = uint16(0)
 
 	for ; c != cmd ; {
 		c,buf,err = m.Read_msp()
@@ -338,9 +339,9 @@ func NewMSPUDP(dd DevDescription) *MSPSerial {
 	return &MSPSerial{klass: dd.klass, conn: conn, reader : reader}
 }
 
-func (m *MSPSerial) Send_msp(cmd byte, payload []byte) {
+func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
 	var buf []byte
-	if m.usev2 {
+	if m.usev2 || cmd > 256 {
 		buf = encode_msp2(cmd, payload)
 	} else {
 		buf = encode_msp(cmd, payload)
@@ -387,6 +388,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
 		vers = fmt.Sprintf("%d.%d.%d", payload[0], payload[1], payload[2])
+		m.fcvers = uint32(payload[0])<<16 | uint32(payload[1])<<8 |  uint32(payload[2])
 	}
 
 	m.Send_msp(msp_BUILD_INFO, nil)
@@ -530,25 +532,38 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 				fmt.Printf("Tx: %v\n", txdata)
 				rxdata := deserialise_rx(payload)
 				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
-				var stscmd byte
+				var stscmd uint16
 				if m.vcapi > 0x200 {
-					stscmd = msp_STATUS_EX
+					if m.fcvers >= 0x010801 {
+						stscmd = msp2_INAV_STATUS
+					} else {
+						stscmd = msp_STATUS_EX
+					}
 				} else {
 					stscmd = msp_STATUS
 				}
 				m.Send_msp(stscmd, nil)
 				_, payload, err := m.Read_cmd(stscmd)
 				if err == nil {
-					var status uint32
-					status = binary.LittleEndian.Uint32(payload[6:10])
+					var status uint64
+					if stscmd == msp2_INAV_STATUS {
+						status = binary.LittleEndian.Uint64(payload[13:21])
+					} else {
+						status = uint64(binary.LittleEndian.Uint32(payload[6:10]))
+					}
 					if status & 1 == 1 {
 						fmt.Print(" armed")
 					} else {
-						if stscmd == msp_STATUS_EX {
-							armf := binary.LittleEndian.Uint16(payload[13:15])
-							fmt.Printf(" unarmed (%x)", armf)
-						} else {
+						if stscmd == msp_STATUS {
 							fmt.Print(" unarmed")
+						} else {
+							var armf uint32
+							if stscmd == msp_STATUS_EX {
+								armf = uint32(binary.LittleEndian.Uint16(payload[13:15]))
+							} else {
+								armf = binary.LittleEndian.Uint32(payload[9:13])
+							}
+							fmt.Printf(" unarmed (%x)", armf)
 						}
 					}
 				} else {

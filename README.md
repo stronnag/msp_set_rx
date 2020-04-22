@@ -120,11 +120,11 @@ Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01503) unarmed Dis-arming
 Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
 Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (01511) unarmed Quiescent
 ```
-Note that from 2020-04-22, in the disarmed state the arming status is displayed as a hex number. For (my) convenience, this uses MSP_STATUS_EX, so only the 16 bit value is reported. For example
+Note that from 2020-04-22, in the disarmed state the arming status is displayed as a hex number, now using 32bit MSP2_INAV_STATUS where possible (after inav 1.8.1).:
 
 ```
 ... unarmed (0) Quiescent
-... unarmed (800) Quiescent
+... unarmed (800) Quiescent ## => Navigation Unsafe
 ```
 
 Older version, stick arming:
