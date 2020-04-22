@@ -85,7 +85,7 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 * Maintains min-throttle (1000uS) for two minutes
 * Disarms (stick or switch command)
 
-The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).
+**The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
 
 Summary of output (`##` indicates a comment, repeated lines removed).
 
@@ -119,6 +119,12 @@ Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01503) unarmed Dis-arming
 ## After 2 minutes & 31 seconds
 Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
 Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (01511) unarmed Quiescent
+```
+Note that from 2020-04-22, in the disarmed state the arming status is displayed as a hex number. For (my) convenience, this uses MSP_STATUS_EX, so only the 16 bit value is reported. For example
+
+```
+... unarmed (0) Quiescent
+... unarmed (800) Quiescent
 ```
 
 Older version, stick arming:
