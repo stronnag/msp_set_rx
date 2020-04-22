@@ -24,6 +24,7 @@ const (
 	msp_STATUS      = 101
 	msp_SET_RAW_RC  = 200
   msp_RC          = 105
+	msp_STATUS_EX   = 150
 
 	rx_START = 1400
 	rx_RAND  =  200
@@ -52,6 +53,7 @@ type MSPSerial struct {
 	conn net.Conn
 	reader *bufio.Reader
 	usev2 bool
+	vcapi uint16
 }
 
 func crc8_dvb_s2(crc byte, a byte) byte {
@@ -367,6 +369,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
+		m.vcapi = uint16(payload[1])<<8 |  uint16(payload[2])
 		api = fmt.Sprintf("%d.%d", payload[1], payload[2])
 	}
 
@@ -527,15 +530,26 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 				fmt.Printf("Tx: %v\n", txdata)
 				rxdata := deserialise_rx(payload)
 				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
-				m.Send_msp(msp_STATUS, nil)
-				_, payload, err := m.Read_cmd(msp_STATUS)
+				var stscmd byte
+				if m.vcapi > 0x200 {
+					stscmd = msp_STATUS_EX
+				} else {
+					stscmd = msp_STATUS
+				}
+				m.Send_msp(stscmd, nil)
+				_, payload, err := m.Read_cmd(stscmd)
 				if err == nil {
 					var status uint32
 					status = binary.LittleEndian.Uint32(payload[6:10])
 					if status & 1 == 1 {
 						fmt.Print(" armed")
 					} else {
-						fmt.Print(" unarmed")
+						if stscmd == msp_STATUS_EX {
+							armf := binary.LittleEndian.Uint16(payload[13:15])
+							fmt.Printf(" unarmed (%x)", armf)
+						} else {
+							fmt.Print(" unarmed")
+						}
 					}
 				} else {
 					log.Fatalf("MSP_STATUS - %v\n", err)
