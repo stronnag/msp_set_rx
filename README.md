@@ -127,6 +127,37 @@ Note that from 2020-04-22, in the disarmed state the arming status is displayed 
 ... unarmed (800) Quiescent ## => Navigation Unsafe
 ```
 
+Real example ....
+
+```
+$ ./msp_set_rx -A 5
+2020/04/22 16:42:21 Using device /dev/ttyACM0
+INAV v2.5.0 WINGFC (a70ac039) API 2.4 "MrFloaty"
+
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00000) unarmed (40200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00001) unarmed (40200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00002) unarmed (40200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00003) unarmed (40200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00004) unarmed (40200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00005) unarmed (200) Quiescent
+Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
+Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00006) unarmed (0) Quiescent
+
+```
+
+| value | reason |
+| ---- | ---- |
+| 0x40000 | No RX link |
+| 0x200 | calibrating |
+
+which seems reasonable, RX not recognised until sensor calibration complete.
+
 Older version, stick arming:
 
 ```
