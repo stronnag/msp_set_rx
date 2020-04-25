@@ -341,7 +341,7 @@ func NewMSPUDP(dd DevDescription) *MSPSerial {
 
 func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
 	var buf []byte
-	if m.usev2 || cmd > 256 {
+	if m.usev2 || cmd > 255 {
 		buf = encode_msp2(cmd, payload)
 	} else {
 		buf = encode_msp(cmd, payload)
