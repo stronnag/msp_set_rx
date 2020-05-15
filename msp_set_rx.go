@@ -17,20 +17,21 @@ const (
 	DevClass_UDP
 )
 
-type DevDescription  struct {
-	klass int
-	name string
-	param int
-	name1 string
+type DevDescription struct {
+	klass  int
+	name   string
+	param  int
+	name1  string
 	param1 int
 }
 
 var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
-	arm = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
-	sarm = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
-	usev2 =  flag.Bool("2", false, "Use MSPv2")
+	arm    = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
+	sarm   = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
+	usev2  = flag.Bool("2", false, "Use MSPv2")
+	cmap   = flag.String("m", "AERT", "channel map")
 )
 
 func check_device() DevDescription {
@@ -54,9 +55,9 @@ func check_device() DevDescription {
 }
 
 func parse_device() DevDescription {
-	dd := DevDescription{klass: DevClass_NONE }
+	dd := DevDescription{klass: DevClass_NONE}
 	r := regexp.MustCompile(`^(tcp|udp)://([\[\]:A-Za-z\-\.0-9]*):(\d+)/{0,1}([A-Za-z\-\.0-9]*):{0,1}(\d*)`)
-	m := r.FindAllStringSubmatch(*device,-1)
+	m := r.FindAllStringSubmatch(*device, -1)
 	if len(m) > 0 {
 		if m[0][1] == "tcp" {
 			dd.klass = DevClass_TCP
@@ -64,16 +65,16 @@ func parse_device() DevDescription {
 			dd.klass = DevClass_UDP
 		}
 		dd.name = m[0][2]
-		dd.param,_ = strconv.Atoi(m[0][3])
+		dd.param, _ = strconv.Atoi(m[0][3])
 		// These are only used for ESP8266 UDP
 		dd.name1 = m[0][4]
-		dd.param1,_ = strconv.Atoi(m[0][5])
+		dd.param1, _ = strconv.Atoi(m[0][5])
 	} else {
-		ss := strings.Split(*device,"@")
-		dd.klass = 	DevClass_SERIAL
+		ss := strings.Split(*device, "@")
+		dd.klass = DevClass_SERIAL
 		dd.name = ss[0]
 		if len(ss) > 1 {
-			dd.param,_ = strconv.Atoi(ss[1])
+			dd.param, _ = strconv.Atoi(ss[1])
 		} else {
 			dd.param = *baud
 		}
@@ -88,7 +89,9 @@ func main() {
 	}
 	flag.Parse()
 
+	fmt.Printf("Map is %s\n", *cmap)
 	devdesc := check_device()
-	s := MSPInit(devdesc, *usev2);
-	s.test_rx(*arm, *sarm);
+	s := MSPInit(devdesc, *usev2)
+	s.set_map(*cmap)
+	s.test_rx(*arm, *sarm)
 }

@@ -26,6 +26,8 @@ map AERT
 set receiver_type = MSP
 ```
 
+Note: MSP RX assumes a AERT channel map. If you set a different map (perhaps because you think using `USE_MSP_RC_OVERRIDE` is a good idea), then you can send a different channel order; however MSP_RC will return AERT regardless of map.
+
 Update RX data at 5Hz or better.
 
 Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` or `make TARGET=FOO OPTIONS=USE_MSP_RC_OVERRIDE=1 BUILD_SUFFIX=msp-override` and enabling the MSP RC override flight mode. It is also advisable to `make TARGET=FOO clean` when changing such defines.
@@ -60,6 +62,8 @@ Usage of msp_set_rx [options]
     	Baud rate (default 115200)
   -d string
     	Serial Device
+  -m string
+    	channel map (default "AERT")
 ```
 
 Sets random (but safe) values:

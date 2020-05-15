@@ -11,6 +11,7 @@ import (
 	"bufio"
 	"time"
 	"math/rand"
+	"strings"
 )
 
 const (
@@ -20,14 +21,14 @@ const (
 	msp_BOARD_INFO  = 4
 	msp_BUILD_INFO  = 5
 
-	msp_NAME        = 10
-	msp_STATUS      = 101
-	msp_SET_RAW_RC  = 200
-  msp_RC          = 105
-	msp_STATUS_EX   = 150
+	msp_NAME         = 10
+	msp_STATUS       = 101
+	msp_SET_RAW_RC   = 200
+	msp_RC           = 105
+	msp_STATUS_EX    = 150
 	msp2_INAV_STATUS = 0x2000
-	rx_START = 1400
-	rx_RAND  =  200
+	rx_START         = 1400
+	rx_RAND          = 200
 
 	state_INIT = iota
 	state_M
@@ -38,35 +39,39 @@ const (
 	state_CRC
 
 	state_X_HEADER2
-  state_X_FLAGS
-  state_X_ID1
-  state_X_ID2
-  state_X_LEN1
-  state_X_LEN2
-  state_X_DATA
-  state_X_CHECKSUM
+	state_X_FLAGS
+	state_X_ID1
+	state_X_ID2
+	state_X_LEN1
+	state_X_LEN2
+	state_X_DATA
+	state_X_CHECKSUM
 )
 
 type MSPSerial struct {
-	klass int
-	p *serial.Port
-	conn net.Conn
+	klass  int
+	p      *serial.Port
+	conn   net.Conn
 	reader *bufio.Reader
-	usev2 bool
-	vcapi uint16
+	usev2  bool
+	vcapi  uint16
 	fcvers uint32
+	a      uint8
+	e      uint8
+	r      uint8
+	t      uint8
 }
 
 func crc8_dvb_s2(crc byte, a byte) byte {
 	crc ^= a
-  for  i:= 0; i < 8; i++ {
-    if (crc & 0x80) != 0 {
+	for i := 0; i < 8; i++ {
+		if (crc & 0x80) != 0 {
 			crc = (crc << 1) ^ 0xd5
 		} else {
-      crc = crc << 1
-    }
+			crc = crc << 1
+		}
 	}
-  return crc
+	return crc
 }
 
 func encode_msp2(cmd uint16, payload []byte) []byte {
@@ -85,7 +90,7 @@ func encode_msp2(cmd uint16, payload []byte) []byte {
 		copy(buf[8:], payload)
 	}
 	crc := byte(0)
-	for _, b := range buf[3:paylen+8] {
+	for _, b := range buf[3 : paylen+8] {
 		crc = crc8_dvb_s2(crc, b)
 	}
 	buf[8+paylen] = crc
@@ -160,7 +165,7 @@ func (m *MSPSerial) Read_msp() (uint16, []byte, error) {
 			case state_M:
 				if inp[0] == 'M' {
 					n = state_DIRN
-				} else if inp[0] == 'X'{
+				} else if inp[0] == 'X' {
 					n = state_X_HEADER2
 				} else {
 					n = state_INIT
@@ -191,13 +196,13 @@ func (m *MSPSerial) Read_msp() (uint16, []byte, error) {
 
 			case state_X_ID1:
 				crc = crc8_dvb_s2(crc, inp[0])
-				xcmd = uint16(inp[0]);
+				xcmd = uint16(inp[0])
 				cmd = inp[0]
 				n = state_X_ID2
 
 			case state_X_ID2:
 				crc = crc8_dvb_s2(crc, inp[0])
-				xcmd |= (uint16(inp[0])<<8);
+				xcmd |= (uint16(inp[0]) << 8)
 				n = state_X_LEN1
 
 			case state_X_LEN1:
@@ -207,7 +212,7 @@ func (m *MSPSerial) Read_msp() (uint16, []byte, error) {
 
 			case state_X_LEN2:
 				crc = crc8_dvb_s2(crc, inp[0])
-				xlen |= (int16(inp[0])<<8);
+				xlen |= (int16(inp[0]) << 8)
 				buf = make([]byte, xlen)
 				if xlen > 0 {
 					n = state_X_DATA
@@ -261,7 +266,7 @@ func (m *MSPSerial) Read_msp() (uint16, []byte, error) {
 			done = true
 		}
 	}
-	if ok != 0  {
+	if ok != 0 {
 		switch ok {
 		case 1:
 			err = errors.New("MSP unrecognised")
@@ -279,13 +284,13 @@ func (m *MSPSerial) Read_cmd(cmd uint16) (uint16, []byte, error) {
 	var err error
 	var c = uint16(0)
 
-	for ; c != cmd ; {
-		c,buf,err = m.Read_msp()
+	for c != cmd {
+		c, buf, err = m.Read_msp()
 		if c != cmd || err != nil {
 			fmt.Printf("Received cmd %v (wanted %v) err=%v\n", c, cmd, err)
 		}
 	}
-	return c,buf,err
+	return c, buf, err
 }
 
 func NewMSPSerial(dd DevDescription) *MSPSerial {
@@ -302,7 +307,7 @@ func NewMSPTCP(dd DevDescription) *MSPSerial {
 	remote := fmt.Sprintf("%s:%d", dd.name, dd.param)
 	addr, err := net.ResolveTCPAddr("tcp", remote)
 	if err == nil {
-    conn, err = net.DialTCP("tcp", nil, addr)
+		conn, err = net.DialTCP("tcp", nil, addr)
 	}
 
 	if err != nil {
@@ -313,7 +318,7 @@ func NewMSPTCP(dd DevDescription) *MSPSerial {
 
 func NewMSPUDP(dd DevDescription) *MSPSerial {
 	var laddr, raddr *net.UDPAddr
-	var reader  *bufio.Reader
+	var reader *bufio.Reader
 	var conn net.Conn
 	var err error
 
@@ -328,15 +333,15 @@ func NewMSPUDP(dd DevDescription) *MSPSerial {
 		}
 	}
 	if err == nil {
-		conn,err = net.DialUDP("udp", laddr, raddr)
+		conn, err = net.DialUDP("udp", laddr, raddr)
 		if err == nil {
-		reader = bufio.NewReader(conn)
+			reader = bufio.NewReader(conn)
 		}
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &MSPSerial{klass: dd.klass, conn: conn, reader : reader}
+	return &MSPSerial{klass: dd.klass, conn: conn, reader: reader}
 }
 
 func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
@@ -354,13 +359,13 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	var m *MSPSerial
 
 	switch dd.klass {
-		case DevClass_SERIAL:
+	case DevClass_SERIAL:
 		m = NewMSPSerial(dd)
 	case DevClass_TCP:
 		m = NewMSPTCP(dd)
 	case DevClass_UDP:
 		m = NewMSPUDP(dd)
-  default:
+	default:
 		fmt.Fprintln(os.Stderr, "Unsupported device")
 		os.Exit(1)
 	}
@@ -370,7 +375,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
-		m.vcapi = uint16(payload[1])<<8 |  uint16(payload[2])
+		m.vcapi = uint16(payload[1])<<8 | uint16(payload[2])
 		api = fmt.Sprintf("%d.%d", payload[1], payload[2])
 	}
 
@@ -388,7 +393,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
 		vers = fmt.Sprintf("%d.%d.%d", payload[0], payload[1], payload[2])
-		m.fcvers = uint32(payload[0])<<16 | uint32(payload[1])<<8 |  uint32(payload[2])
+		m.fcvers = uint32(payload[0])<<16 | uint32(payload[1])<<8 | uint32(payload[2])
 	}
 
 	m.Send_msp(msp_BUILD_INFO, nil)
@@ -406,10 +411,10 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 		fmt.Fprintln(os.Stderr, "read: ", err)
 	} else {
 		if len(payload) > 8 {
- 			board = string(payload[9:])
+			board = string(payload[9:])
 			have_name = true
 		} else {
- 			board = string(payload[0:4])
+			board = string(payload[0:4])
 		}
 	}
 
@@ -426,12 +431,17 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	return m
 }
 
-func serialise_rx(phase int8, sarm int) ([]byte) {
+func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	buf := make([]byte, 16)
-	var aoff = int(0);
+	var aoff = int(0)
 	if sarm > 4 && sarm < 9 {
-		aoff = (sarm-1)*2;
+		aoff = (sarm - 1) * 2
 	}
+
+	var ae = m.a + 2
+	var ee = m.e + 2
+	var re = m.r + 2
+	var te = m.t + 2
 
 	binary.LittleEndian.PutUint16(buf[8:10], uint16(1017))
 	binary.LittleEndian.PutUint16(buf[10:12], uint16(1442))
@@ -444,70 +454,77 @@ func serialise_rx(phase int8, sarm int) ([]byte) {
 	switch phase {
 	case 0:
 		n := rand.Intn(rx_RAND)
-		binary.LittleEndian.PutUint16(buf[0:2], uint16(rx_START+n))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
-		binary.LittleEndian.PutUint16(buf[2:4], uint16(rx_START+n))
+		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
-		binary.LittleEndian.PutUint16(buf[4:6], uint16(rx_START+n))
+		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
-		binary.LittleEndian.PutUint16(buf[6:8], uint16(rx_START+n))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(rx_START+n))
 	case 1:
-		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 
 	case 2:
-		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		if sarm == 0 {
-			binary.LittleEndian.PutUint16(buf[4:6], uint16(2000))
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(2000))
 		} else {
-			binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
 		}
-		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 	case 3:
-		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 		if aoff != 0 {
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
 		}
 	case 4:
-		binary.LittleEndian.PutUint16(buf[0:2], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[2:4], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		if sarm == 0 {
-			binary.LittleEndian.PutUint16(buf[4:6], uint16(1000))
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1000))
 		} else {
-			binary.LittleEndian.PutUint16(buf[4:6], uint16(1500))
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1000))
 		}
-		binary.LittleEndian.PutUint16(buf[6:8], uint16(1000))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 	}
 	return buf
 }
 
 
-func deserialise_rx(b []byte) ([]int16) {
+func deserialise_rx(b []byte) []int16 {
 	buf := make([]int16, 8)
-	for j:= 0; j < 8; j++ {
-		n := j*2;
-		buf[j] = int16(binary.LittleEndian.Uint16(b[n:n+2]))
+	for j := 0; j < 8; j++ {
+		n := j * 2
+		buf[j] = int16(binary.LittleEndian.Uint16(b[n : n+2]))
 	}
 	return buf
 }
+func (m *MSPSerial) set_map(cmap string) {
+	m.a = uint8(strings.Index(cmap, "A") * 2)
+	m.e = uint8(strings.Index(cmap, "E") * 2)
+	m.t = uint8(strings.Index(cmap, "T") * 2)
+	m.r = uint8(strings.Index(cmap, "R") * 2)
+	fmt.Printf("a: %d, e: %d, t: %d, r %d\n", m.a, m.e, m.t, m.r)
+}
 
-func (m *MSPSerial) test_rx(arm bool, sarm int) () {
+func (m *MSPSerial) test_rx(arm bool, sarm int) {
 	cnt := 0
 	var phase = int8(0)
 
 	if sarm != 0 {
-		arm = true;
+		arm = true
 	}
 
-	for ;; {
+	for {
 		if arm {
 			if cnt <= 300 || cnt > 1510 {
 				phase = 1
@@ -521,11 +538,11 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 				phase = 0
 			}
 		}
-		tdata := serialise_rx(phase, sarm);
+		tdata := m.serialise_rx(phase, sarm)
 		m.Send_msp(msp_SET_RAW_RC, tdata)
 		_, _, err := m.Read_cmd(msp_SET_RAW_RC)
 		if err == nil {
-			m.Send_msp(msp_RC,nil)
+			m.Send_msp(msp_RC, nil)
 			_, payload, err := m.Read_cmd(msp_RC)
 			if err == nil {
 				txdata := deserialise_rx(tdata)
@@ -551,7 +568,7 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 					} else {
 						status = uint64(binary.LittleEndian.Uint32(payload[6:10]))
 					}
-					if status & 1 == 1 {
+					if status&1 == 1 {
 						fmt.Print(" armed")
 					} else {
 						if stscmd == msp_STATUS {
@@ -571,15 +588,15 @@ func (m *MSPSerial) test_rx(arm bool, sarm int) () {
 				}
 				switch phase {
 				case 0:
-					fmt.Printf("\n");
+					fmt.Printf("\n")
 				case 1:
-					fmt.Printf(" Quiescent\n");
+					fmt.Printf(" Quiescent\n")
 				case 2:
-					fmt.Printf(" Arming\n");
+					fmt.Printf(" Arming\n")
 				case 3:
-					fmt.Printf(" Min throttle\n");
+					fmt.Printf(" Min throttle\n")
 				case 4:
-					fmt.Printf(" Dis-arming\n");
+					fmt.Printf(" Dis-arming\n")
 				}
 			} else {
 				log.Fatalf("MSP_SET_RAW_RC - %v\n", err)
