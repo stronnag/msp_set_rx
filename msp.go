@@ -56,10 +56,10 @@ type MSPSerial struct {
 	usev2  bool
 	vcapi  uint16
 	fcvers uint32
-	a      uint8
-	e      uint8
-	r      uint8
-	t      uint8
+	a      int8
+	e      int8
+	r      int8
+	t      int8
 }
 
 func crc8_dvb_s2(crc byte, a byte) byte {
@@ -509,11 +509,13 @@ func deserialise_rx(b []byte) []int16 {
 	return buf
 }
 func (m *MSPSerial) set_map(cmap string) {
-	m.a = uint8(strings.Index(cmap, "A") * 2)
-	m.e = uint8(strings.Index(cmap, "E") * 2)
-	m.t = uint8(strings.Index(cmap, "T") * 2)
-	m.r = uint8(strings.Index(cmap, "R") * 2)
-	fmt.Printf("a: %d, e: %d, t: %d, r %d\n", m.a, m.e, m.t, m.r)
+	m.a = int8(strings.Index(cmap, "A") * 2)
+	m.e = int8(strings.Index(cmap, "E") * 2)
+	m.t = int8(strings.Index(cmap, "T") * 2)
+	m.r = int8(strings.Index(cmap, "R") * 2)
+	if m.a < 0 || m.e < 0 || m.t < 0 || m.r < 0 {
+		log.Fatal("Invalid map\n")
+	}
 }
 
 func (m *MSPSerial) test_rx(arm bool, sarm int) {
