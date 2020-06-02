@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/tarm/serial"
+	"go.bug.st/serial"
 	"log"
 	"os"
 	"net"
@@ -50,7 +50,7 @@ const (
 
 type MSPSerial struct {
 	klass  int
-	p      *serial.Port
+	p      serial.Port
 	conn   net.Conn
 	reader *bufio.Reader
 	usev2  bool
@@ -294,8 +294,10 @@ func (m *MSPSerial) Read_cmd(cmd uint16) (uint16, []byte, error) {
 }
 
 func NewMSPSerial(dd DevDescription) *MSPSerial {
-	c := &serial.Config{Name: dd.name, Baud: dd.param}
-	p, err := serial.OpenPort(c)
+	mode := &serial.Mode{
+		BaudRate: dd.param,
+	}
+	p, err := serial.Open(dd.name, mode)
 	if err != nil {
 		log.Fatal(err)
 	}

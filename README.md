@@ -35,12 +35,6 @@ Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE`
 ## Building
 
 * Clone this repository
-* If you haven't previously go got `tarm/serial` then do that:
-
- ```
- go get github.com/tarm/serial
- ```
-
 * Build the test application
 
  ```
