@@ -31,6 +31,7 @@ var (
 	arm    = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
 	sarm   = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
 	usev2  = flag.Bool("2", false, "Use MSPv2")
+	fs     = flag.Bool("fs", false, "Test failsafe")
 	cmap   = flag.String("m", "AERT", "channel map")
 )
 
@@ -93,5 +94,5 @@ func main() {
 	devdesc := check_device()
 	s := MSPInit(devdesc, *usev2)
 	s.set_map(*cmap)
-	s.test_rx(*arm, *sarm)
+	s.test_rx(*arm, *sarm, *fs)
 }

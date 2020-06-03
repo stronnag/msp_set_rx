@@ -32,6 +32,8 @@ Update RX data at 5Hz or better.
 
 Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` or `make TARGET=FOO OPTIONS=USE_MSP_RC_OVERRIDE=1 BUILD_SUFFIX=msp-override` and enabling the MSP RC override flight mode. It is also advisable to `make TARGET=FOO clean` when changing such defines.
 
+Note that as this tool can cause motors to run, the usual "don't be stupid / remove props / secure the vehicle" apply.
+
 ## Building
 
 * Clone this repository
@@ -56,11 +58,13 @@ Usage of msp_set_rx [options]
     	Baud rate (default 115200)
   -d string
     	Serial Device
+  -fs
+    	Test failsafe
   -m string
     	channel map (default "AERT")
 ```
 
-Sets random (but safe) values:
+Sets random (but safe-ish) values:
 
 ```
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
@@ -80,7 +84,7 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 
 * Sets a quiescent state for 30 seconds
 * Arms using the configured  (stick or switch) command
-* Maintains min-throttle (1000uS) for two minutes
+* Maintains low-throttle (< 1300uS) for two minutes
 * Disarms (stick or switch command)
 
 **The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
@@ -213,6 +217,10 @@ Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (01511) unarmed Quiescent
 
 While this attempts to arm at a safe throttle value, removing props or using a current limiter is recommended.
 
+### Failsafe test
+
+If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe **and not come out of failsafe**. Take this as a suble warning about the wisdom of using `MSP_SET_RC` for anything serious.
+
 ## Caveats
 
 * Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and the ignore responses.
@@ -221,6 +229,7 @@ While this attempts to arm at a safe throttle value, removing props or using a c
 * Correct `map` for you FC version (4 character, 8 character etc.)
 * For F1, no other `RX_xxx` feature set.
 * Use a supported FC
+* Remove the props etc.
 
 ## Licence
 
