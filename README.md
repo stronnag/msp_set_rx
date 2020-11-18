@@ -30,9 +30,9 @@ Note: MSP RX assumes a AERT channel map. If you set a different map (perhaps bec
 
 Update RX data at 5Hz or better.
 
-Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` or `make TARGET=FOO OPTIONS=USE_MSP_RC_OVERRIDE=1 BUILD_SUFFIX=msp-override` and enabling the MSP RC override flight mode. It is also advisable to `make TARGET=FOO clean` when changing such defines.
+Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode. It is also advisable to `make <TARGET> clean` when changing such defines.
 
-Note that as this tool can cause motors to run, the usual "don't be stupid / remove props / secure the vehicle" apply.
+Note that as this tool can cause motors to run, the usual "don't be stupid / remove props / secure the vehicle" warnings apply.
 
 ## Building
 
