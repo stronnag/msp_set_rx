@@ -32,7 +32,6 @@ var (
 	sarm   = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
 	usev2  = flag.Bool("2", false, "Use MSPv2")
 	fs     = flag.Bool("fs", false, "Test failsafe")
-	cmap   = flag.String("m", "AERT", "channel map")
 )
 
 func check_device() DevDescription {
@@ -90,9 +89,7 @@ func main() {
 	}
 	flag.Parse()
 
-	fmt.Printf("Map is %s\n", *cmap)
 	devdesc := check_device()
 	s := MSPInit(devdesc, *usev2)
-	s.set_map(*cmap)
 	s.test_rx(*arm, *sarm, *fs)
 }

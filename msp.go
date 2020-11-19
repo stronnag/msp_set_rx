@@ -10,7 +10,6 @@ import (
 	"bufio"
 	"time"
 	"math/rand"
-	"strings"
 )
 
 const (
@@ -20,11 +19,13 @@ const (
 	msp_BOARD_INFO  = 4
 	msp_BUILD_INFO  = 5
 
-	msp_NAME         = 10
-	msp_STATUS       = 101
-	msp_SET_RAW_RC   = 200
-	msp_RC           = 105
-	msp_STATUS_EX    = 150
+	msp_NAME       = 10
+	msp_STATUS     = 101
+	msp_SET_RAW_RC = 200
+	msp_RC         = 105
+	msp_STATUS_EX  = 150
+	msp_RX_MAP     = 64
+
 	msp2_INAV_STATUS = 0x2000
 	rx_START         = 1400
 	rx_RAND          = 200
@@ -69,6 +70,8 @@ type MSPSerial struct {
 	t      int8
 	c0     chan SChan
 }
+
+var nchan = int(8)
 
 func crc8_dvb_s2(crc byte, a byte) byte {
 	crc ^= a
@@ -401,6 +404,22 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 					board = string(v.data[0:4])
 				}
 				fmt.Fprintf(os.Stderr, "%s v%s %s (%s) API %s", fw, vers, board, gitrev, api)
+				m.Send_msp(msp_RX_MAP, nil)
+			case msp_RX_MAP:
+				if v.len == 4 {
+					m.a = int8(v.data[0]) * 2
+					m.e = int8(v.data[1]) * 2
+					m.r = int8(v.data[2]) * 2
+					m.t = int8(v.data[3]) * 2
+					var cmap [4]byte
+					cmap[v.data[0]] = 'A'
+					cmap[v.data[1]] = 'E'
+					cmap[v.data[2]] = 'R'
+					cmap[v.data[3]] = 'T'
+					fmt.Fprintf(os.Stderr, " map %s", cmap)
+				} else {
+					fmt.Fprintln(os.Stderr, "")
+				}
 				m.Send_msp(msp_NAME, nil)
 			case msp_NAME:
 				if v.len > 0 {
@@ -418,9 +437,14 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 }
 
 func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
-	buf := make([]byte, 16)
+	nchan = 8
+	if sarm > nchan && sarm < 17 {
+		nchan = sarm
+	}
+
+	buf := make([]byte, nchan*2)
 	var aoff = int(0)
-	if sarm > 4 && sarm < 9 {
+	if sarm > 4 && sarm < 17 {
 		aoff = (sarm - 1) * 2
 	}
 
@@ -433,6 +457,11 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	binary.LittleEndian.PutUint16(buf[10:12], uint16(1442))
 	binary.LittleEndian.PutUint16(buf[12:14], uint16(1605))
 	binary.LittleEndian.PutUint16(buf[14:16], uint16(1669))
+
+	for i := 8; i < sarm; i++ {
+		binary.LittleEndian.PutUint16(buf[i*2:2+i*2], uint16(1000))
+	}
+
 	if aoff != 0 {
 		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1001))
 	}
@@ -488,21 +517,16 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 
 
 func deserialise_rx(b []byte) []int16 {
-	buf := make([]int16, 8)
-	for j := 0; j < 8; j++ {
+	bl := binary.Size(b) / 2
+	if bl > nchan {
+		bl = nchan
+	}
+	buf := make([]int16, bl)
+	for j := 0; j < bl; j++ {
 		n := j * 2
 		buf[j] = int16(binary.LittleEndian.Uint16(b[n : n+2]))
 	}
 	return buf
-}
-func (m *MSPSerial) set_map(cmap string) {
-	m.a = int8(strings.Index(cmap, "A") * 2)
-	m.e = int8(strings.Index(cmap, "E") * 2)
-	m.t = int8(strings.Index(cmap, "T") * 2)
-	m.r = int8(strings.Index(cmap, "R") * 2)
-	if m.a < 0 || m.e < 0 || m.t < 0 || m.r < 0 {
-		log.Fatal("Invalid map\n")
-	}
 }
 
 func (m *MSPSerial) test_rx(arm bool, sarm int, fs bool) {

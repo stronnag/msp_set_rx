@@ -18,15 +18,13 @@ A supported FC
 
 ```
 # for ancient firmware
-map AERT5678
 feature RX_MSP
 
 # Modern firmware (e.g inav 1.8 and later)
-map AERT
 set receiver_type = MSP
 ```
 
-Note: MSP RX assumes a AERT channel map. If you set a different map (perhaps because you think using `USE_MSP_RC_OVERRIDE` is a good idea), then you can send a different channel order; however MSP_RC will return AERT regardless of map.
+Note: MSP RX assumes a "AERT" channel map. `msp_set_rx` uses the map set on the FC to send data, but always reports "AERT". Note that earlier versions of `msp_set_rx` assumed "AERT" unless you explicitly told it to use a different map (the now removed `-m` option).
 
 Update RX data at 5Hz or better.
 
@@ -52,7 +50,7 @@ $ ./msp_set_rx --help
 Usage of msp_set_rx [options]
   -2	Use MSPv2
   -A int
-    	Arm Switch, (5-8), assumes 2000us will arm
+    	Arm Switch, (5-16), assumes 2000us will arm
   -a	Arm (take care now) [only inav versions supporting stick arming]
   -b int
     	Baud rate (default 115200)
@@ -60,8 +58,6 @@ Usage of msp_set_rx [options]
     	Serial Device
   -fs
     	Test failsafe
-  -m string
-    	channel map (default "AERT")
 ```
 
 Sets random (but safe-ish) values:
@@ -70,10 +66,10 @@ Sets random (but safe-ish) values:
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 # and hence, probably, for example
 C:\> msp_set_rx.exe -d COM42 -b 115200
-# Arm on switch 5 (set range as 1800-2100 in CLI/configurator)
-$ ./msp_set_rx -A 5 -d /dev/ttyACM0
+# Arm on switch 10 (set range as 1800-2100 in CLI/configurator)
+$ ./msp_set_rx -A 10 -d /dev/ttyACM0
 # MSPv2
-$ ./msp_set_rx -2 -A 5 -d /dev/ttyACM0
+$ ./msp_set_rx -2 -A 10 -d /dev/ttyACM0
 ```
 
 Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
@@ -89,7 +85,7 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 
 **The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
 
-Summary of output (`##` indicates a comment, repeated lines removed).
+Summary of output (`##` indicates a comment, repeated lines removed). If the arm channel is less than 8, then 8 channels are reported, otherwise channels upto / including the arm channel are reported, to a maximum of 16.
 
 Post 2020-01-11, shows armed status and iteration count, switch arming:
 
@@ -226,7 +222,6 @@ If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s 
 * Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and the ignore responses.
 * Esnure you're set the correct AUX range to arm
 * Ensure you've met the required arming conditions
-* Correct `map` for you FC version (4 character, 8 character etc.)
 * For F1, no other `RX_xxx` feature set.
 * Use a supported FC
 * Remove the props etc.
