@@ -220,7 +220,7 @@ If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s 
 ## Caveats
 
 * Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and the ignore responses.
-* Esnure you're set the correct AUX range to arm
+* Ensure you're set the correct AUX range to arm
 * Ensure you've met the required arming conditions
 * For F1, no other `RX_xxx` feature set.
 * Use a supported FC
