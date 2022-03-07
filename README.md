@@ -10,7 +10,7 @@ Every few months, someone will come along on inav github / RC Groups / Telegram 
 
 Well it does, if you do it right. This example demonstrates usage.
 
-As Go is available on pretty much any OS, you can easily verify that it works.
+As Go is available on pretty much any OS, you can easily verify that it works, with this small application.
 
 ## FC Prerequisites
 
@@ -38,7 +38,7 @@ Note that as this tool can cause motors to run, the usual "don't be stupid / rem
 * Build the test application
 
  ```
- go build
+ make
  ```
 
 This should result in a `msp_set_rx` application.
@@ -229,3 +229,4 @@ If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s 
 ## Licence
 
 Whatever approximates to none / public domain in your locale.
+0BSD (Zero clause BSD)  if an actual license is required by law.
