@@ -1,4 +1,4 @@
-# MSP SET_RC considered dangerous
+# MSP SET_RAW RC considered dangerous
 
 ## Overview
 
@@ -215,11 +215,11 @@ While this attempts to arm at a safe throttle value, removing props or using a c
 
 ### Failsafe test
 
-If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe **and not come out of failsafe**. Take this as a suble warning about the wisdom of using `MSP_SET_RC` for anything serious.
+If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe **and not come out of failsafe**. Take this as a suble warning about the wisdom of using `MSP_SET_RAW_RC` for anything serious.
 
 ## Caveats
 
-* Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and the ignore responses.
+* Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and ignore the responses.
 * Ensure you're set the correct AUX range to arm
 * Ensure you've met the required arming conditions
 * For F1, no other `RX_xxx` feature set.
@@ -228,5 +228,4 @@ If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s 
 
 ## Licence
 
-Whatever approximates to none / public domain in your locale.
-0BSD (Zero clause BSD)  if an actual license is required by law.
+Whatever approximates to none / public domain in your locale. 0BSD (Zero clause BSD)  if an actual license is required by law.
