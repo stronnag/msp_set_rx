@@ -5,10 +5,13 @@ SRC = msp.go msp_set_rx.go
 all: $(APP)
 
 $(APP): $(SRC) go.sum
-	go build -ldflags "-w -s" -o $@
+	go build -ldflags "-w -s" -o $@ $(SRC)
 
 go.sum: go.mod
 	go mod tidy
+
+arm_status: arm_status.go
+	go build -ldflags "-w -s" -o $@ $<
 
 clean:
 	go clean
