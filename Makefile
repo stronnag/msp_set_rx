@@ -1,7 +1,15 @@
-prefix ?= /usr/local
+prefix ?= $HOME/.local
 
 APP = msp_set_rx
-SRC = msp.go msp_set_rx.go
+UNAME := $(shell uname)
+
+BTSRC = btaddr_other.go
+ifeq ($(UNAME), Linux)
+ BTSRC = btaddr_linux.go
+endif
+
+SRC = msp.go msp_set_rx.go $(BTSRC)
+
 all: $(APP)
 
 $(APP): $(SRC) go.sum

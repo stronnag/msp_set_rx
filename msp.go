@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"go.bug.st/serial"
 	"log"
-	"os"
-	"net"
-	"bufio"
-	"time"
 	"math/rand"
+	"net"
+	"os"
+	"time"
 )
 
 const (
@@ -26,9 +25,10 @@ const (
 	msp_STATUS_EX  = 150
 	msp_RX_MAP     = 64
 
-	msp2_INAV_STATUS = 0x2000
-	rx_START         = 1400
-	rx_RAND          = 200
+	msp_COMMON_SETTING = 0x1003
+	msp2_INAV_STATUS   = 0x2000
+	rx_START           = 1400
+	rx_RAND            = 200
 )
 const (
 	state_INIT = iota
@@ -49,6 +49,8 @@ const (
 	state_X_CHECKSUM
 )
 
+const SETTING_STR string = "nav_extra_arming_safety"
+
 type SChan struct {
 	len  uint16
 	cmd  uint16
@@ -56,12 +58,17 @@ type SChan struct {
 	data []byte
 }
 
+type SerDev interface {
+	Read(buf []byte) (int, error)
+	Write(buf []byte) (int, error)
+	Close() error
+}
+
 type MSPSerial struct {
 	klass  int
-	p      serial.Port
-	conn   net.Conn
-	reader *bufio.Reader
+	sd     SerDev
 	usev2  bool
+	bypass bool
 	vcapi  uint16
 	fcvers uint32
 	a      int8
@@ -130,34 +137,17 @@ func encode_msp(cmd uint16, payload []byte) []byte {
 	return buf
 }
 
-func (m *MSPSerial) read(inp []byte) (int, error) {
-	if m.klass == DevClass_SERIAL {
-		return m.p.Read(inp)
-	} else if m.klass == DevClass_TCP {
-		return m.conn.Read(inp)
-	} else {
-		return m.reader.Read(inp)
-	}
-}
-
-func (m *MSPSerial) write(payload []byte) (int, error) {
-	if m.klass == DevClass_SERIAL {
-		return m.p.Write(payload)
-	} else {
-		return m.conn.Write(payload)
-	}
-}
-
 func (m *MSPSerial) Read_msp(c0 chan SChan) {
 	inp := make([]byte, 128)
+	var sc SChan
 	var count = uint16(0)
 	var crc = byte(0)
-	var sc SChan
 
 	n := state_INIT
+
 	for {
-		nb, err := m.read(inp)
-		if err == nil {
+		nb, err := m.sd.Read(inp)
+		if err == nil && nb > 0 {
 			for i := 0; i < nb; i++ {
 				switch n {
 				case state_INIT:
@@ -267,84 +257,72 @@ func (m *MSPSerial) Read_msp(c0 chan SChan) {
 					if crc != ccrc {
 						fmt.Fprintf(os.Stderr, "CRC error on %d\n", sc.cmd)
 					} else {
+						//						fmt.Fprintf(os.Stderr, "Cmd %v Len %v\n", sc.cmd, sc.len)
 						c0 <- sc
 					}
 					n = state_INIT
 				}
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "Read error: %s\n", err)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Read %v\n", err)
+			} else {
+				fmt.Fprintln(os.Stderr, "serial EOF")
+			}
+			m.sd.Close()
+			os.Exit(2)
 		}
 	}
 }
 
-/**
-func (m *MSPSerial) Read_cmd(cmd uint16) (uint16, []byte, error) {
-	var buf []byte
-	var err error
-	var c = uint16(0)
-
-	for c != cmd {
-		c, buf, err = m.Read_msp()
-		if c != cmd || err != nil {
-			fmt.Printf("Received cmd %v (wanted %v) err=%v\n", c, cmd, err)
-		}
-	}
-	return c, buf, err
-}
-**/
 func NewMSPSerial(dd DevDescription) *MSPSerial {
-	mode := &serial.Mode{
-		BaudRate: dd.param,
-	}
-	p, err := serial.Open(dd.name, mode)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	return &MSPSerial{klass: dd.klass, p: p}
-}
-
-func NewMSPTCP(dd DevDescription) *MSPSerial {
-	var conn net.Conn
-	remote := fmt.Sprintf("%s:%d", dd.name, dd.param)
-	addr, err := net.ResolveTCPAddr("tcp", remote)
-	if err == nil {
-		conn, err = net.DialTCP("tcp", nil, addr)
-	}
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	return &MSPSerial{klass: dd.klass, conn: conn}
-}
-
-func NewMSPUDP(dd DevDescription) *MSPSerial {
-	var laddr, raddr *net.UDPAddr
-	var reader *bufio.Reader
-	var conn net.Conn
-	var err error
-
-	if dd.param1 != 0 {
-		raddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name1, dd.param1))
-		laddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name, dd.param))
-	} else {
-		if dd.name == "" {
+	switch dd.klass {
+	case DevClass_SERIAL:
+		p, err := serial.Open(dd.name, &serial.Mode{BaudRate: dd.param})
+		if err != nil {
+			log.Fatal(err)
+		}
+		return &MSPSerial{klass: dd.klass, sd: p}
+	case DevClass_BT:
+		bt := NewBT(dd.name)
+		return &MSPSerial{klass: dd.klass, sd: bt}
+	case DevClass_TCP:
+		var conn net.Conn
+		remote := fmt.Sprintf("%s:%d", dd.name, dd.param)
+		addr, err := net.ResolveTCPAddr("tcp", remote)
+		if err == nil {
+			conn, err = net.DialTCP("tcp", nil, addr)
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		return &MSPSerial{klass: dd.klass, sd: conn}
+	case DevClass_UDP:
+		var laddr, raddr *net.UDPAddr
+		var conn net.Conn
+		var err error
+		if dd.param1 != 0 {
+			raddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name1, dd.param1))
 			laddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name, dd.param))
 		} else {
-			raddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name, dd.param))
+			if dd.name == "" {
+				laddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name, dd.param))
+			} else {
+				raddr, err = net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dd.name, dd.param))
+			}
 		}
-	}
-	if err == nil {
-		conn, err = net.DialUDP("udp", laddr, raddr)
 		if err == nil {
-			reader = bufio.NewReader(conn)
+			conn, err = net.DialUDP("udp", laddr, raddr)
 		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		return &MSPSerial{klass: dd.klass, sd: conn}
+	default:
+		fmt.Fprintln(os.Stderr, "Unsupported device")
+		os.Exit(1)
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	return &MSPSerial{klass: dd.klass, conn: conn, reader: reader}
+	return nil
 }
 
 func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
@@ -354,24 +332,13 @@ func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
 	} else {
 		buf = encode_msp(cmd, payload)
 	}
-	m.write(buf)
+	m.sd.Write(buf)
 }
 
 func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	var fw, api, vers, board, gitrev string
-	var m *MSPSerial
 
-	switch dd.klass {
-	case DevClass_SERIAL:
-		m = NewMSPSerial(dd)
-	case DevClass_TCP:
-		m = NewMSPTCP(dd)
-	case DevClass_UDP:
-		m = NewMSPUDP(dd)
-	default:
-		fmt.Fprintln(os.Stderr, "Unsupported device")
-		os.Exit(1)
-	}
+	m := NewMSPSerial(dd)
 	m.usev2 = _usev2
 	m.c0 = make(chan SChan)
 	go m.Read_msp(m.c0)
@@ -385,6 +352,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 				if v.len > 2 {
 					api = fmt.Sprintf("%d.%d", v.data[1], v.data[2])
 					m.vcapi = uint16(v.data[1])<<8 | uint16(v.data[2])
+					m.usev2 = (v.data[1] == 2)
 					m.Send_msp(msp_FC_VARIANT, nil)
 				}
 			case msp_FC_VARIANT:
@@ -403,8 +371,27 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 				} else {
 					board = string(v.data[0:4])
 				}
-				fmt.Fprintf(os.Stderr, "%s v%s %s (%s) API %s", fw, vers, board, gitrev, api)
+				fmt.Fprintf(os.Stderr, "%s v%s %s (%s) API %s\n", fw, vers, board, gitrev, api)
+				if m.usev2 {
+					lstr := len(SETTING_STR)
+					buf := make([]byte, lstr+1)
+					copy(buf, SETTING_STR)
+					buf[lstr] = 0
+					m.Send_msp(msp_COMMON_SETTING, buf)
+				} else {
+					m.Send_msp(msp_RX_MAP, nil)
+				}
+
+			case msp_COMMON_SETTING:
+				if v.len > 0 {
+					bystr := v.data[0]
+					if bystr == 2 {
+						m.bypass = true
+					}
+					fmt.Printf("%s: %d (bypass %v)\n", SETTING_STR, bystr, m.bypass)
+				}
 				m.Send_msp(msp_RX_MAP, nil)
+
 			case msp_RX_MAP:
 				if v.len == 4 {
 					m.a = int8(v.data[0]) * 2
@@ -488,7 +475,11 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 		if sarm == 0 {
 			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(2000))
 		} else {
-			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+			if m.bypass {
+				binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1999))
+			} else {
+				binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1501))
+			}
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
 		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
@@ -514,7 +505,6 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	}
 	return buf
 }
-
 
 func deserialise_rx(b []byte) []int16 {
 	bl := binary.Size(b) / 2
