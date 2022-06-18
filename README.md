@@ -85,6 +85,8 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 
 **The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
 
+If `nav_extra_arming_safety = ALLOW_BYPASS` will be honoured to allow arming with bypass.
+
 Summary of output (`##` indicates a comment, repeated lines removed). If the arm channel is less than 8, then 8 channels are reported, otherwise channels upto / including the arm channel are reported, to a maximum of 16.
 
 Post 2020-01-11, shows armed status and iteration count, switch arming:
