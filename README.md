@@ -1,4 +1,4 @@
-# MSP SET_RAW RC considered dangerous
+# MSP_SET_RAW RC considered harmful
 
 ## Overview
 
@@ -6,7 +6,7 @@ This golang program exercises `MSP SET_RAW_RC`.
 
 ### Why
 
-Every few months, someone will come along on inav github / RC Groups / Telegram / some other random support channel and state that RX_MSP doesn't work.
+Every few months, someone will come along on INAV Github / RC Groups / Telegram / Discord / some other random support channel and state that `RX_MSP` / `set receiver_type = MSP`  doesn't work.
 
 Well it does, if you do it right. This example demonstrates usage.
 
@@ -24,11 +24,11 @@ feature RX_MSP
 set receiver_type = MSP
 ```
 
-Note: MSP RX assumes a "AERT" channel map. `msp_set_rx` uses the map set on the FC to send data, but always reports "AERT". Note that earlier versions of `msp_set_rx` assumed "AERT" unless you explicitly told it to use a different map (the now removed `-m` option).
+Note: `MSP_SET_RAW_RC` assumes a "AERT" channel map. `msp_set_rx` uses the map set on the FC to send data, but always reports "AERT". Note that earlier versions of `msp_set_rx` assumed "AERT" unless you explicitly told it to use a different map (the now removed `-m` option).
 
 Update RX data at 5Hz or better.
 
-Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode. It is also advisable to `make <TARGET> clean` when changing such defines.
+Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode. It is also advisable to `make <TARGET_clean>` when changing such defines.
 
 Note that as this tool can cause motors to run, the usual "don't be stupid / remove props / secure the vehicle" warnings apply.
 
@@ -85,7 +85,7 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 
 **The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
 
-If `nav_extra_arming_safety = ALLOW_BYPASS` will be honoured to allow arming with bypass.
+If `nav_extra_arming_safety = ALLOW_BYPASS` is set on the FC, it will be honoured to allow arming with bypass.
 
 Summary of output (`##` indicates a comment, repeated lines removed). If the arm channel is less than 8, then 8 channels are reported, otherwise channels upto / including the arm channel are reported, to a maximum of 16.
 

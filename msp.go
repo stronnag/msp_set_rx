@@ -337,6 +337,7 @@ func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
 
 func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	var fw, api, vers, board, gitrev string
+	var v6 bool
 
 	m := NewMSPSerial(dd)
 	m.usev2 = _usev2
@@ -362,6 +363,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 				vers = fmt.Sprintf("%d.%d.%d", v.data[0], v.data[1], v.data[2])
 				m.fcvers = uint32(v.data[0])<<16 | uint32(v.data[1])<<8 | uint32(v.data[2])
 				m.Send_msp(msp_BUILD_INFO, nil)
+				v6 = (v.data[0] == 6)
 			case msp_BUILD_INFO:
 				gitrev = string(v.data[19:])
 				m.Send_msp(msp_BOARD_INFO, nil)
@@ -385,6 +387,9 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 			case msp_COMMON_SETTING:
 				if v.len > 0 {
 					bystr := v.data[0]
+					if v6 {
+						bystr++
+					}
 					if bystr == 2 {
 						m.bypass = true
 					}
