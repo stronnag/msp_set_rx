@@ -217,7 +217,7 @@ While this attempts to arm at a safe throttle value, removing props or using a c
 
 ### Failsafe test
 
-If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe for this period.
+If the failsafe mode is commanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe for this period.
 
 ## Caveats
 
