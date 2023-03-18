@@ -87,7 +87,7 @@ The application can also test arm / disarm, with the `-a` option (where the inav
 
 If `nav_extra_arming_safety = ALLOW_BYPASS` is set on the FC, it will be honoured to allow arming with bypass.
 
-Summary of output (`##` indicates a comment, repeated lines removed). If the arm channel is less than 8, then 8 channels are reported, otherwise channels upto / including the arm channel are reported, to a maximum of 16.
+Summary of output (`##` indicates a comment, repeated lines removed). 16 channels are reported (earlier versions displayed 8).
 
 Post 2020-01-11, shows armed status and iteration count, switch arming:
 
@@ -217,7 +217,7 @@ While this attempts to arm at a safe throttle value, removing props or using a c
 
 ### Failsafe test
 
-If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe **and not come out of failsafe**. Take this as a suble warning about the wisdom of using `MSP_SET_RAW_RC` for anything serious.
+If the failsafe mode is commmanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe for this period.
 
 ## Caveats
 

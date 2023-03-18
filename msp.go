@@ -24,6 +24,7 @@ const (
 	msp_RC         = 105
 	msp_STATUS_EX  = 150
 	msp_RX_MAP     = 64
+	msp_BOXNAMES   = 116
 
 	msp_COMMON_SETTING = 0x1003
 	msp2_INAV_STATUS   = 0x2000
@@ -78,7 +79,7 @@ type MSPSerial struct {
 	c0     chan SChan
 }
 
-var nchan = int(8)
+var nchan = int(16)
 
 func crc8_dvb_s2(crc byte, a byte) byte {
 	crc ^= a
@@ -138,7 +139,7 @@ func encode_msp(cmd uint16, payload []byte) []byte {
 }
 
 func (m *MSPSerial) Read_msp(c0 chan SChan) {
-	inp := make([]byte, 128)
+	inp := make([]byte, 1024)
 	var sc SChan
 	var count = uint16(0)
 	var crc = byte(0)
@@ -415,9 +416,16 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 				m.Send_msp(msp_NAME, nil)
 			case msp_NAME:
 				if v.len > 0 {
-					fmt.Fprintf(os.Stderr, " \"%s\"\n", v.data)
+					fmt.Fprintf(os.Stderr, " \"%s\"\n", v.data[:v.len])
 				} else {
 					fmt.Fprintln(os.Stderr, "")
+				}
+				m.Send_msp(msp_BOXNAMES, nil)
+			case msp_BOXNAMES:
+				if v.len > 0 {
+					fmt.Fprintf(os.Stderr, "BOX: %s\n", v.data[:v.len])
+				} else {
+					fmt.Fprintln(os.Stderr, "No Boxen")
 				}
 				done = true
 			default:
@@ -429,7 +437,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 }
 
 func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
-	nchan = 8
+	nchan = 16
 	if sarm > nchan && sarm < 17 {
 		nchan = sarm
 	}
@@ -445,10 +453,10 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	var re = m.r + 2
 	var te = m.t + 2
 
-	binary.LittleEndian.PutUint16(buf[8:10], uint16(1017))
-	binary.LittleEndian.PutUint16(buf[10:12], uint16(1442))
-	binary.LittleEndian.PutUint16(buf[12:14], uint16(1605))
-	binary.LittleEndian.PutUint16(buf[14:16], uint16(1669))
+	binary.LittleEndian.PutUint16(buf[8:10], uint16(1000))
+	binary.LittleEndian.PutUint16(buf[10:12], uint16(1000))
+	binary.LittleEndian.PutUint16(buf[12:14], uint16(1000))
+	binary.LittleEndian.PutUint16(buf[14:16], uint16(1000))
 
 	for i := 8; i < sarm; i++ {
 		binary.LittleEndian.PutUint16(buf[i*2:2+i*2], uint16(1000))
@@ -467,11 +475,15 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 		n = rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
-		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(rx_START+n))
+		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(990))
 	case 1:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+		if m.bypass {
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(2000))
+		} else {
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 
 	case 2:
@@ -548,73 +560,80 @@ func (m *MSPSerial) test_rx(arm bool, sarm int, fs bool) {
 			}
 		}
 
+		infs := false
 		if fs && cnt > 399 && cnt < 500 {
-			fmt.Printf("Failsafe\n")
+			fmt.Printf("Failsafe ")
+			infs = true
 		} else {
 			tdata := m.serialise_rx(phase, sarm)
 			m.Send_msp(msp_SET_RAW_RC, tdata)
 			v = <-m.c0
 			txdata := deserialise_rx(tdata)
 			fmt.Printf("Tx: %v\n", txdata)
+
+			m.Send_msp(msp_RC, nil)
+			v = <-m.c0
+			if v.cmd == msp_RC {
+				rxdata := deserialise_rx(v.data)
+				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
+			}
 		}
-		m.Send_msp(msp_RC, nil)
+		var stscmd uint16
+		if m.vcapi > 0x200 {
+			if m.fcvers >= 0x010801 {
+				stscmd = msp2_INAV_STATUS
+			} else {
+				stscmd = msp_STATUS_EX
+			}
+		} else {
+			stscmd = msp_STATUS
+		}
+		m.Send_msp(stscmd, nil)
 		v = <-m.c0
-		if v.cmd == msp_RC {
-			rxdata := deserialise_rx(v.data)
-			fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
-			var stscmd uint16
-			if m.vcapi > 0x200 {
-				if m.fcvers >= 0x010801 {
-					stscmd = msp2_INAV_STATUS
-				} else {
-					stscmd = msp_STATUS_EX
+		if v.ok {
+			var status uint64
+			if stscmd == msp2_INAV_STATUS {
+				status = binary.LittleEndian.Uint64(v.data[13:21])
+			} else {
+				status = uint64(binary.LittleEndian.Uint32(v.data[6:10]))
+			}
+
+			var armf uint32
+			armf = 0
+			if stscmd == msp_STATUS_EX {
+				armf = uint32(binary.LittleEndian.Uint16(v.data[13:15]))
+			} else {
+				armf = binary.LittleEndian.Uint32(v.data[9:13])
+			}
+
+			if infs {
+				fmt.Printf(" <%x> ", status)
+			}
+			if status&1 == 1 {
+				fmt.Print(" armed")
+				if armf > 12 {
+					fmt.Printf(" (%x)", armf)
 				}
 			} else {
-				stscmd = msp_STATUS
-			}
-			m.Send_msp(stscmd, nil)
-			v = <-m.c0
-			if v.ok {
-				var status uint64
-				if stscmd == msp2_INAV_STATUS {
-					status = binary.LittleEndian.Uint64(v.data[13:21])
+				if stscmd == msp_STATUS {
+					fmt.Print(" unarmed")
 				} else {
-					status = uint64(binary.LittleEndian.Uint32(v.data[6:10]))
+					fmt.Printf(" unarmed (%x)", armf)
 				}
+			}
+		}
 
-				var armf uint32
-				armf = 0
-				if stscmd == msp_STATUS_EX {
-					armf = uint32(binary.LittleEndian.Uint16(v.data[13:15]))
-				} else {
-					armf = binary.LittleEndian.Uint32(v.data[9:13])
-				}
-
-				if status&1 == 1 {
-					fmt.Print(" armed")
-					if armf > 12 {
-						fmt.Printf(" (%x)", armf)
-					}
-				} else {
-					if stscmd == msp_STATUS {
-						fmt.Print(" unarmed")
-					} else {
-						fmt.Printf(" unarmed (%x)", armf)
-					}
-				}
-			}
-			switch phase {
-			case 0:
-				fmt.Printf("\n")
-			case 1:
-				fmt.Printf(" Quiescent\n")
-			case 2:
-				fmt.Printf(" Arming\n")
-			case 3:
-				fmt.Printf(" Low throttle\n")
-			case 4:
-				fmt.Printf(" Dis-arming\n")
-			}
+		switch phase {
+		case 0:
+			fmt.Printf("\n")
+		case 1:
+			fmt.Printf(" Quiescent\n")
+		case 2:
+			fmt.Printf(" Arming\n")
+		case 3:
+			fmt.Printf(" Low throttle\n")
+		case 4:
+			fmt.Printf(" Dis-arming\n")
 		}
 		time.Sleep(100 * time.Millisecond)
 		cnt++
