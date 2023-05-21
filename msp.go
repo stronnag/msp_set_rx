@@ -12,19 +12,34 @@ import (
 )
 
 const (
+	PERM_ARM     = 0
+	PERM_MANUAL  = 12
+	PERM_HORIZON = 2
+	PERM_ANGLE   = 1
+	PERM_LAUNCH  = 36
+	PERM_RTH     = 10
+	PERM_WP      = 28
+	PERM_CRUISE  = 45
+	PERM_ALTHOLD = 3
+	PERM_POSHOLD = 11
+	PERM_FS      = 27
+)
+
+const (
 	msp_API_VERSION = 1
 	msp_FC_VARIANT  = 2
 	msp_FC_VERSION  = 3
 	msp_BOARD_INFO  = 4
 	msp_BUILD_INFO  = 5
 
-	msp_NAME       = 10
-	msp_STATUS     = 101
-	msp_SET_RAW_RC = 200
-	msp_RC         = 105
-	msp_STATUS_EX  = 150
-	msp_RX_MAP     = 64
-	msp_BOXNAMES   = 116
+	msp_NAME        = 10
+	msp_MODE_RANGES = 34
+	msp_STATUS      = 101
+	msp_SET_RAW_RC  = 200
+	msp_RC          = 105
+	msp_STATUS_EX   = 150
+	msp_RX_MAP      = 64
+	msp_BOXNAMES    = 116
 
 	msp_COMMON_SETTING = 0x1003
 	msp2_INAV_STATUS   = 0x2000
@@ -51,6 +66,7 @@ const (
 )
 
 const SETTING_STR string = "nav_extra_arming_safety"
+const MAX_MODE_ACTIVATION_CONDITION_COUNT int = 40
 
 type SChan struct {
 	len  uint16
@@ -66,17 +82,19 @@ type SerDev interface {
 }
 
 type MSPSerial struct {
-	klass  int
-	sd     SerDev
-	usev2  bool
-	bypass bool
-	vcapi  uint16
-	fcvers uint32
-	a      int8
-	e      int8
-	r      int8
-	t      int8
-	c0     chan SChan
+	klass   int
+	sd      SerDev
+	usev2   bool
+	bypass  bool
+	vcapi   uint16
+	fcvers  uint32
+	a       int8
+	e       int8
+	r       int8
+	t       int8
+	c0      chan SChan
+	swchan  int8
+	swvalue uint16
 }
 
 var nchan = int(16)
@@ -277,16 +295,19 @@ func (m *MSPSerial) Read_msp(c0 chan SChan) {
 }
 
 func NewMSPSerial(dd DevDescription) *MSPSerial {
+	m := MSPSerial{swchan: -1, klass: dd.klass}
 	switch dd.klass {
 	case DevClass_SERIAL:
 		p, err := serial.Open(dd.name, &serial.Mode{BaudRate: dd.param})
 		if err != nil {
 			log.Fatal(err)
 		}
-		return &MSPSerial{klass: dd.klass, sd: p}
+		m.sd = p
+		return &m
 	case DevClass_BT:
 		bt := NewBT(dd.name)
-		return &MSPSerial{klass: dd.klass, sd: bt}
+		m.sd = bt
+		return &m
 	case DevClass_TCP:
 		var conn net.Conn
 		remote := fmt.Sprintf("%s:%d", dd.name, dd.param)
@@ -297,7 +318,8 @@ func NewMSPSerial(dd DevDescription) *MSPSerial {
 		if err != nil {
 			log.Fatal(err)
 		}
-		return &MSPSerial{klass: dd.klass, sd: conn}
+		m.sd = conn
+		return &m
 	case DevClass_UDP:
 		var laddr, raddr *net.UDPAddr
 		var conn net.Conn
@@ -318,7 +340,8 @@ func NewMSPSerial(dd DevDescription) *MSPSerial {
 		if err != nil {
 			log.Fatal(err)
 		}
-		return &MSPSerial{klass: dd.klass, sd: conn}
+		m.sd = conn
+		return &m
 	default:
 		fmt.Fprintln(os.Stderr, "Unsupported device")
 		os.Exit(1)
@@ -336,12 +359,11 @@ func (m *MSPSerial) Send_msp(cmd uint16, payload []byte) {
 	m.sd.Write(buf)
 }
 
-func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
+func MSPInit(dd DevDescription) *MSPSerial {
 	var fw, api, vers, board, gitrev string
 	var v6 bool
 
 	m := NewMSPSerial(dd)
-	m.usev2 = _usev2
 	m.c0 = make(chan SChan)
 	go m.Read_msp(m.c0)
 
@@ -391,7 +413,7 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 					if v6 {
 						bystr++
 					}
-					if bystr == 2 {
+					if bystr != 0 {
 						m.bypass = true
 					}
 					fmt.Printf("%s: %d (bypass %v)\n", SETTING_STR, bystr, m.bypass)
@@ -427,6 +449,12 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 				} else {
 					fmt.Fprintln(os.Stderr, "No Boxen")
 				}
+				m.Send_msp(msp_MODE_RANGES, nil)
+
+			case msp_MODE_RANGES:
+				if v.len > 0 {
+					m.deserialise_modes(v.data)
+				}
 				done = true
 			default:
 				fmt.Fprintf(os.Stderr, "Unsolicited %d, length %d\n", v.cmd, v.len)
@@ -436,16 +464,35 @@ func MSPInit(dd DevDescription, _usev2 bool) *MSPSerial {
 	return m
 }
 
-func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
-	nchan = 16
-	if sarm > nchan && sarm < 17 {
-		nchan = sarm
+func (m *MSPSerial) deserialise_modes(buf []byte) {
+	i := 0
+	/* for reference
+		   type ModeRange struct {
+		    boxid   byte
+		    chanidx byte
+		    start   byte
+		    end     byte
+	     }
+	*/
+	for j := 0; j < MAX_MODE_ACTIVATION_CONDITION_COUNT; j++ {
+		if buf[i+2] != 0 && buf[i+3] != 0 {
+			if buf[i] == PERM_ARM {
+				m.swchan = 4 + int8(buf[i+1])
+				m.swvalue = uint16(buf[i+3]+buf[i+2])*25/2 + 900
+				break
+			}
+		}
+		i += 4
 	}
+}
 
+func (m *MSPSerial) serialise_rx(phase int8) []byte {
+	nchan = 18
 	buf := make([]byte, nchan*2)
-	var aoff = int(0)
-	if sarm > 4 && sarm < 17 {
-		aoff = (sarm - 1) * 2
+	aoff := int(0)
+
+	if m.swchan != -1 {
+		aoff = int(m.swchan) * 2
 	}
 
 	var ae = m.a + 2
@@ -453,12 +500,7 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	var re = m.r + 2
 	var te = m.t + 2
 
-	binary.LittleEndian.PutUint16(buf[8:10], uint16(1000))
-	binary.LittleEndian.PutUint16(buf[10:12], uint16(1000))
-	binary.LittleEndian.PutUint16(buf[12:14], uint16(1000))
-	binary.LittleEndian.PutUint16(buf[14:16], uint16(1000))
-
-	for i := 8; i < sarm; i++ {
+	for i := 4; i < nchan; i++ {
 		binary.LittleEndian.PutUint16(buf[i*2:2+i*2], uint16(1000))
 	}
 
@@ -489,15 +531,13 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 	case 2:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
-		if sarm == 0 {
-			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(2000))
+		if m.bypass {
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1999))
 		} else {
-			if m.bypass {
-				binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1999))
-			} else {
-				binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1501))
-			}
-			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
+			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1501))
+		}
+		if aoff != 0 {
+			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))
 		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 	case 3:
@@ -507,17 +547,13 @@ func (m *MSPSerial) serialise_rx(phase int8, sarm int) []byte {
 		thr := 1100 + rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(thr))
 		if aoff != 0 {
-			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(2000))
+			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))
 		}
 	case 4:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
-		if sarm == 0 {
-			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1000))
-		} else {
-			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
-			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1000))
-		}
+		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(999))
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 	}
 	return buf
@@ -536,14 +572,10 @@ func deserialise_rx(b []byte) []int16 {
 	return buf
 }
 
-func (m *MSPSerial) test_rx(arm bool, sarm int, fs bool) {
+func (m *MSPSerial) test_rx(arm bool, fs bool) {
 	cnt := 0
 	var phase = int8(0)
 	var v SChan
-
-	if sarm != 0 {
-		arm = true
-	}
 
 	for {
 		if arm {
@@ -565,7 +597,7 @@ func (m *MSPSerial) test_rx(arm bool, sarm int, fs bool) {
 			fmt.Printf("Failsafe ")
 			infs = true
 		} else {
-			tdata := m.serialise_rx(phase, sarm)
+			tdata := m.serialise_rx(phase)
 			m.Send_msp(msp_SET_RAW_RC, tdata)
 			v = <-m.c0
 			txdata := deserialise_rx(tdata)

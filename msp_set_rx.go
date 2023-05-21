@@ -31,9 +31,7 @@ type DevDescription struct {
 var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
-	arm    = flag.Bool("a", false, "Arm (take care now) [with iNav versions supporting stick arming]")
-	sarm   = flag.Int("A", 0, "Arm Switch, (5-8), assumes 2000us will arm")
-	usev2  = flag.Bool("2", false, "Use MSPv2")
+	arm    = flag.Bool("a", false, "Arm (take care now)")
 	fs     = flag.Bool("fs", false, "Test failsafe")
 )
 
@@ -157,6 +155,6 @@ func main() {
 	flag.Parse()
 
 	devdesc := check_device()
-	s := MSPInit(devdesc, *usev2)
-	s.test_rx(*arm, *sarm, *fs)
+	s := MSPInit(devdesc)
+	s.test_rx(*arm, *fs)
 }
