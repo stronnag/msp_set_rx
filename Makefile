@@ -1,4 +1,4 @@
-prefix ?= $HOME/.local
+prefix ?= $$HOME/.local
 
 APP = msp_set_rx
 UNAME := $(shell uname)
