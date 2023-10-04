@@ -7,7 +7,12 @@ import (
 )
 
 func main() {
-	arm_fails := [...]string{"", "", "Armed", "", "", "", "",
+	arm_fails := [...]string{"", "",
+		"Armed",
+		"Ever Armed",
+		"HITL",
+		"SITL",
+		"",
 		"Failsafe", "Not level", "Calibrating", "Overload",
 		"Navigation unsafe", "Compass cal", "Acc cal", "Arm switch", "Hardware failure",
 		"Box failsafe", "Box killswitch", "RC Link", "Throttle", "CLI",

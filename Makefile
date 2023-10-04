@@ -10,7 +10,7 @@ endif
 
 SRC = msp.go msp_set_rx.go $(BTSRC) inav_misc.go
 
-all: $(APP)
+all: $(APP) arm_status
 
 $(APP): $(SRC) go.sum
 	go build -ldflags "-w -s" -o $@ $(SRC)

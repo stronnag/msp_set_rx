@@ -197,7 +197,25 @@ Rx: [1500 1500 1500 1189 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 
 ```
 Pairs of transmitted `Tx:` and received `Rx:` data (`MSP_SET_RAW_RC` / `MSP_RC`). First four channels are,  for `Tx:` are according to the configured `map`, and for `Rx:` `AERT`. These are followed by followed by channels 5-18.
 
-The `Rx:` line also shows (first stanza) application timer (`00003` ((deciseconds)), arm state (`unarmed`), arming flags (`(40200`) and application mode (`Quiescent`). Where is arm state is non-blocking, the numeric value is not shown (last line).
+The `Rx:` line also shows (first stanza) application timer (`00003` ((deciseconds)), arm state (`unarmed`), arming flags (`(40200`) and application mode (`Quiescent`). Where is arm state is just "Armed", the numeric value is not shown (last line).
+
+#### arm_status
+
+There is a simple tool to interpret arming status `arm_status`. It accepts one or more numeric status codes and displays human readable interpretation:
+
+```
+./arm_status 28 84c00
+Status 00000028:
+ 00000008 => Ever Armed
+ 00000020 => SITL
+Status 00084c00:
+ 00000400 => Overload
+ 00000800 => Navigation unsafe
+ 00004000 => Arm switch
+ 00080000 => Throttle
+```
+
+Copy it onto `$PATH` if you wish.
 
 ### Failsafe test
 
