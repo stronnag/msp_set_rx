@@ -20,7 +20,7 @@ func main() {
 				fmt.Printf("Status %08x:\n", v)
 				for i := 0; i < 32; i++ {
 					if (v & (1 << i)) != 0 {
-						if arm_fails[i] != "" {
+						if i < len(arm_fails) && arm_fails[i] != "" {
 							fmt.Printf(" %08x => %s\n", (1 << i), arm_fails[i])
 						}
 					}
