@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -81,6 +82,13 @@ type SerDev interface {
 	Close() error
 }
 
+type ModeRange struct {
+	boxid   byte
+	chanidx byte
+	start   byte
+	end     byte
+}
+
 type MSPSerial struct {
 	klass   int
 	sd      SerDev
@@ -95,6 +103,7 @@ type MSPSerial struct {
 	c0      chan SChan
 	swchan  int8
 	swvalue uint16
+	mranges []ModeRange
 }
 
 var nchan = int(16)
@@ -464,25 +473,36 @@ func MSPInit(dd DevDescription) *MSPSerial {
 	return m
 }
 
+/*
+	 for reference
+			   type ModeRange struct {
+			    boxid   byte 0
+			    chanidx byte 1
+			    start   byte 2
+			    end     byte 3
+		     }
+*/
 func (m *MSPSerial) deserialise_modes(buf []byte) {
 	i := 0
-	/* for reference
-		   type ModeRange struct {
-		    boxid   byte
-		    chanidx byte
-		    start   byte
-		    end     byte
-	     }
-	*/
 	for j := 0; j < MAX_MODE_ACTIVATION_CONDITION_COUNT; j++ {
-		if buf[i+2] != 0 && buf[i+3] != 0 {
-			if buf[i] == PERM_ARM {
-				m.swchan = 4 + int8(buf[i+1])
-				m.swvalue = uint16(buf[i+3]+buf[i+2])*25/2 + 900
-				break
-			}
+		if buf[i+3] != 0 {
+			m.mranges = append(m.mranges, ModeRange{buf[i], buf[i+1], buf[i+2], buf[i+3]})
 		}
 		i += 4
+	}
+	sort.Slice(m.mranges, func(i, j int) bool {
+		if m.mranges[i].chanidx != m.mranges[j].chanidx {
+			return m.mranges[i].chanidx < m.mranges[j].chanidx
+		}
+		return m.mranges[i].start < m.mranges[j].start
+	})
+
+	for _, r := range m.mranges {
+		dump_mode(r)
+		if r.boxid == PERM_ARM {
+			m.swchan = 4 + int8(r.chanidx)
+			m.swvalue = uint16(r.end+r.start)*25/2 + 900
+		}
 	}
 }
 
