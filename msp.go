@@ -27,6 +27,14 @@ const (
 )
 
 const (
+	PHASE_Unknown = iota
+	PHASE_Quiescent
+	PHASE_Arming
+	PHASE_LowThrottle
+	PHASE_Disarming
+)
+
+const (
 	msp_API_VERSION = 1
 	msp_FC_VARIANT  = 2
 	msp_FC_VERSION  = 3
@@ -509,7 +517,7 @@ func (m *MSPSerial) deserialise_modes(buf []byte) {
 	}
 }
 
-func (m *MSPSerial) serialise_rx(phase int8) []byte {
+func (m *MSPSerial) serialise_rx(phase int) []byte {
 	nchan = 18
 	buf := make([]byte, nchan*2)
 	aoff := int(0)
@@ -528,11 +536,11 @@ func (m *MSPSerial) serialise_rx(phase int8) []byte {
 	}
 
 	if aoff != 0 {
-		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1001))
+		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1001)) // a little clue as to the arm channel
 	}
 
 	switch phase {
-	case 0:
+	case PHASE_Unknown:
 		n := rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
@@ -541,7 +549,7 @@ func (m *MSPSerial) serialise_rx(phase int8) []byte {
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(rx_START+n))
 		n = rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(990))
-	case 1:
+	case PHASE_Quiescent:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		if m.bypass {
@@ -551,7 +559,7 @@ func (m *MSPSerial) serialise_rx(phase int8) []byte {
 		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 
-	case 2:
+	case PHASE_Arming:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		if m.bypass {
@@ -563,7 +571,7 @@ func (m *MSPSerial) serialise_rx(phase int8) []byte {
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))
 		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
-	case 3:
+	case PHASE_LowThrottle:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
@@ -572,7 +580,7 @@ func (m *MSPSerial) serialise_rx(phase int8) []byte {
 		if aoff != 0 {
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))
 		}
-	case 4:
+	case PHASE_Disarming:
 		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
@@ -597,21 +605,21 @@ func deserialise_rx(b []byte) []int16 {
 
 func (m *MSPSerial) test_rx(arm bool, fs bool) {
 	cnt := 0
-	var phase = int8(0)
+	var phase = PHASE_Unknown
 	var v SChan
 
 	for {
 		if arm {
 			if cnt <= 300 || cnt > 1510 {
-				phase = 1
+				phase = PHASE_Quiescent
 			} else if cnt > 1500 {
-				phase = 4
+				phase = PHASE_Disarming
 			} else if cnt > 310 {
-				phase = 3
+				phase = PHASE_LowThrottle
 			} else if cnt > 300 {
-				phase = 2
+				phase = PHASE_Arming
 			} else {
-				phase = 0
+				phase = PHASE_Unknown
 			}
 		}
 
@@ -679,15 +687,15 @@ func (m *MSPSerial) test_rx(arm bool, fs bool) {
 		}
 
 		switch phase {
-		case 0:
+		case PHASE_Unknown:
 			fmt.Printf("\n")
-		case 1:
+		case PHASE_Quiescent:
 			fmt.Printf(" Quiescent\n")
-		case 2:
+		case PHASE_Arming:
 			fmt.Printf(" Arming\n")
-		case 3:
+		case PHASE_LowThrottle:
 			fmt.Printf(" Low throttle\n")
-		case 4:
+		case PHASE_Disarming:
 			fmt.Printf(" Dis-arming\n")
 		}
 		time.Sleep(100 * time.Millisecond)
