@@ -486,6 +486,9 @@ func (m *MSPSerial) deserialise_modes(buf []byte) {
 	i := 0
 	for j := 0; j < MAX_MODE_ACTIVATION_CONDITION_COUNT; j++ {
 		if buf[i+3] != 0 {
+			if buf[0] == PERM_ARM && (buf[i+3]-buf[i+2]) > 40 {
+				continue
+			}
 			m.mranges = append(m.mranges, ModeRange{buf[i], buf[i+1], buf[i+2], buf[i+3]})
 		}
 		i += 4

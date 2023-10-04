@@ -214,7 +214,7 @@ This is more comprehensive (and complex) example.
 ## Caveats
 
 * Ensure you provide (at least) 5Hz RX data, but don't overload the FC; MSP is a request-response protocol, don't just "spam" the FC via a high frequency timer and ignore the responses.
-* Ensure you're set the correct AUX range to arm
+* Ensure you've set a correct, valid AUX range to arm. In particular and for safety, the ARM range must be less or equal to 1000 in order to allow disarming.
 * Ensure you've met the required arming conditions
 * Use a supported FC or the SITL
 * Remove the props etc.
