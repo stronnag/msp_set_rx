@@ -186,6 +186,19 @@ which seems reasonable, RX not recognised until sensor calibration complete.
 
 While this tool attempts to arm at a safe throttle value, removing props or using a current limiter is recommended. Using the [INAV_SITL](https://github.com/iNavFlight/inav/blob/master/docs/SITL/SITL.md) is also a good option. A suitable configuration for such experiments is described in the [fl2sitl wiki](https://github.com/stronnag/bbl2kml/wiki/fl2sitl#sitl-configuration)
 
+### Data shown
+
+```
+Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
+Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00003) unarmed (40200) Quiescent
+...
+Tx: [1500 1500 1189 1500 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
+Rx: [1500 1500 1500 1189 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00311) armed Low throttle
+```
+Pairs of transmitted `Tx:` and received `Rx:` data (`MSP_SET_RAW_RC` / `MSP_RC`). First four channels are,  for `Tx:` are according to the configured `map`, and for `Rx:` `AERT`. These are followed by followed by channels 5-18.
+
+The `Rx:` line also shows (first stanza) application timer (`00003` ((deciseconds)), arm state (`unarmed`), arming flags (`(40200`) and application mode (`Quiescent`). Where is arm state is non-blocking, the numeric value is not shown (last line).
+
 ### Failsafe test
 
 If the failsafe mode is commanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe for this period.
