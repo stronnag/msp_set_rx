@@ -76,8 +76,10 @@ func (m *MSPSerial) test_rx() {
 	cc := make(chan os.Signal, 1)
 	signal.Notify(cc, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	fmt.Println("Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe")
 	log.Printf("Start TX loop")
+
+	ticker := time.NewTicker(100 * time.Millisecond)
 
 	for done := false; done == false; {
 		select {

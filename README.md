@@ -1,43 +1,42 @@
-# MSP_SET_RAW RC considered harmful
+# MSP_SET_RAW RC "considered harmful?"
 
 ## Overview
 
-This golang program exercises `MSP SET_RAW_RC`.
+This golang program exercises `MSP_SET_RAW_RC`.
 
 ### Why
 
 Every few months, someone will come along on INAV Github / RC Groups / Telegram / Discord / some other random support channel and state that `RX_MSP` / `set receiver_type = MSP`  doesn't work.
 
-Well it does, if you do it right. This example demonstrates usage.
+Well it does, if you do it correctly. This example demonstrates usage.
 
-As Go is available on pretty much any OS, you can easily verify that it works, with this small application.
+As Go is available on pretty much any OS, you can even verify that it works, with this small application.
 
-**NOTE: The previous, verbose version of this tool is now in the `legacy` branch, should you want to play with that**
+**NOTE: The previous, verbose, timer activated version of this tool is now in the `legacy` branch, should you want to play with that**
 
 ## FC Prerequisites
 
 * A supported FC
-* INAV v6 or later, earlier versions may work
+* INAV v6 or later, earlier versions may also work
+* The FC should have been configured to a state in which it can be armed:
+  - The sensors are calibrated
+  - Required sensors are powered (e.g. GPS requiring battery)
+  - If necessary `nav_extra_arming_safety` may be set to `ALLOW_BYPASS`
+  - The arming channel is defined, with a range less than 1000
 
+### Set the correct RX type
+
+Modern firmware (e.g INAV 1.8 and later)
 ```
-# Modern firmware (e.g INAV 1.8 and later)
 set receiver_type = MSP
 ```
 
 For older versions of this example, with INAV prior to INAV 1.8, you can try:
-
 ```
 # for ancient firmware
 feature RX_MSP
 ```
-
-However, don't be surprised if it fails.
-
-* The FC should have been configured to a state in which it can be armed:
-  - The sensors are calibrated
-  - Sensors are powered (e.g. GPS requiring battery)
-  - If necessary `nav_extra_arming_safety` may be set to `ALLOW_BYPASS`
-  - The arming channel is defined, with a range less than 1000
+However, don't be surprised if ancient versions fail to work with `msp_set_rx`.
 
 ## Building
 
@@ -69,25 +68,25 @@ When initialised, the application will accept keypresses:
 * `Q`,`q`,`Ctrl-C` : Clean exit. If the FC is armed, it will be disarmed first.
 * `F`: Unclean exit, potentially causing fail-safe. Be prepared to handle the consequences.
 
-If the application is exited uncleanly, then on restarting `msp_set_rx`, the DFC should recover from fail-safe.
-
+If the application is exited uncleanly, then on restarting `msp_set_rx`, the FC should recover from fail-safe (note we perturb roll and pitch to force recovery).
 
 ```
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 # and hence, probably, for example
 C:\> msp_set_rx.exe -d COM42 -b 115200
-# Arm on switch set in CLI/configurator)
-$ ./msp_set_rx # Linux, autodetect
+# Linux, autodetect
+$ ./msp_set_rx
 ```
 
 Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
 
-
 While this tool attempts to arm at a safe throttle value, removing props or using a current limiter is recommended. Using the [INAV_SITL](https://github.com/iNavFlight/inav/blob/master/docs/SITL/SITL.md) is also a good option. A suitable configuration for such experiments is described in the [fl2sitl wiki](https://github.com/stronnag/bbl2kml/wiki/fl2sitl#sitl-configuration)
+
+Please also note that when armed, the motors will run at randomly changing throttle between 1100us and 1300us. Please ensure you and your hardware are content with this.
 
 ## Examples
 
-### Cold start
+### FC example
 
 ```
 ./msp_set_rx
@@ -107,6 +106,7 @@ chan: 10, start: 1500, end: 2100 ARM
 chan: 11, start: 1450, end: 2100 MANUAL
 chan: 12, start: 1600, end: 2100 BEEPER
 Arming set for channel 10 / 1800us
+Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe
 [msp_set_rx] 19:20:09.101738 Start TX loop
 [msp_set_rx] 19:20:09.228487 Box: FAILSAFE (40000000) Arm: RCLink (0x40000)
 [msp_set_rx] 19:20:09.932720 Box:  (0) Arm: Ready to arm (0x0)
@@ -139,7 +139,7 @@ $ ./msp_set_rx
 $
 ```
 
-Use `F` key press to exit without diarming:
+Use `F` key press to exit without disarming, causing fail-safe:
 
 ```
 $ ./msp_set_rx
@@ -161,7 +161,64 @@ $ ./msp_set_rx
 
 ```
 
-Note the FC "Box" state shows `ARM,ANGLE,FAILSAFE`, and that we are armed. It then quickly recovers (0.5s, meeting the required 5Hz update rate) to a normal armed state, from which we can disarm /  quit cleanly.
+Note the FC "Box" state shows `ARM,ANGLE,FAILSAFE`, and that we are still armed. It then quickly recovers (0.5s, i.e. meeting the required 5Hz update rate) to a normal armed state, from which we can disarm /  quit cleanly.
+
+### SITL example
+
+You can also use the INAV SITL to test. This has the advantage of not requiring hardware. The same arming prerequisites apply.
+
+```
+$ ./msp_set_rx -d tcp://localhost:5761
+[msp_set_rx] 21:09:56.436998 Using device localhost
+INAV v7.0.0 SITL (3a2412e5) API 2.5
+nav_extra_arming_safety: 2 (bypass true)
+map: AETR
+name: "BENCHYMCTESTY"
+box: ARM;PREARM;MULTI FUNCTION;ANGLE;HORIZON;TURN ASSIST;HEADING HOLD;CAMSTAB;NAV POSHOLD;LOITER CHANGE;NAV RTH;NAV WP;NAV CRUISE;NAV COURSE HOLD;HOME RESET;GCS NAV;WP PLANNER;MISSION CHANGE;SOARING;NAV ALTHOLD;MANUAL;NAV LAUNCH;SERVO AUTOTRIM;AUTO TUNE;AUTO LEVEL TRIM;BEEPER;BEEPER MUTE;OSD OFF;BLACKBOX;KILLSWITCH;FAILSAFE;CAMERA CONTROL 1;CAMERA CONTROL 2;CAMERA CONTROL 3;OSD ALT 1;OSD ALT 2;OSD ALT 3;
+chan:  5, start: 1300, end: 1700 NAV POSHOLD
+chan:  5, start: 1700, end: 2100 NAV RTH
+chan:  6, start: 1300, end: 2100 NAV WP
+chan:  7, start: 1700, end: 2100 NAV ALTHOLD
+chan:  7, start: 1700, end: 2100 NAV COURSE HOLD
+chan:  8, start: 1375, end: 1600 NAV LAUNCH
+chan: 10, start: 1500, end: 2100 ARM
+chan: 11, start: 1450, end: 2100 MANUAL
+chan: 12, start: 1600, end: 2100 BEEPER
+Arming set for channel 10 / 1800us
+Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe
+[msp_set_rx] 21:09:57.497876 Start TX loop
+[msp_set_rx] 21:09:57.599109 Box: MANUAL,FAILSAFE (40100000) Arm: Calibrate RCLink (0x40220)
+[msp_set_rx] 21:09:58.299169 Box: MANUAL (100000) Arm: Calibrate (0x220)
+[msp_set_rx] 21:10:01.499031 Box:  (0) Arm: Ready to arm (0x20)
+[msp_set_rx] 21:10:23.699638 Box: ARM (1) Arm: Armed (0x2c)
+[msp_set_rx] 21:10:30.099620 Box:  (0) Arm: Ready to arm (0x28)
+[msp_set_rx] 21:10:31.598849 Box: ARM (1) Arm: Armed (0x2c)
+[msp_set_rx] 21:10:35.299420 Box:  (0) Arm: Ready to arm (0x28)
+```
+
+Note that the SITL captures some of the early status / calibration changes.
+
+#### SITL usage
+
+In one terminal (with `eeprom.bin` pre-configured for MSP receiver):
+
+```
+inav_SITL --path /path/to/eeprom.bin --sim xp
+```
+
+In another terminal:
+
+```
+fl2sitl -minimal
+```
+
+Then:
+
+```
+msp_set_rx -d tcp://localhost:5761
+```
+
+Note that in order for the SITL to arm, a simulator is needed.In the example we use [fl2sitl](https://github.com/stronnag/bbl2kml/wiki/fl2sitl) with `-minimal` to provide the simplest simulation that will unlock the SITL sensors and allow arming.
 
 ## arm_status
 
@@ -196,6 +253,10 @@ This is more comprehensive (and complex) example.
 * Ensure you've met the required arming conditions
 * Use a supported FC or the SITL
 * Remove the props etc.
+
+## Postscript
+
+Really, it's all about preparation, in particular the interrogation of the FC prior to sending any `MSP_SET_RAW_RC` data in order to get the box names and switch settings that will be necessary to arm and monitor the "box" and "arming" flags that enable your application to monitor the state of the automated FC.
 
 ## Licence
 
