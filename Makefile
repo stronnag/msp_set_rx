@@ -8,7 +8,7 @@ ifeq ($(UNAME), Linux)
  BTSRC = btaddr_linux.go
 endif
 
-SRC = msp.go msp_set_rx.go $(BTSRC) inav_misc.go
+SRC = msp.go msp_set_rx.go $(BTSRC) inav_misc.go event_loop.go
 
 all: $(APP) arm_status
 

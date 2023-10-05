@@ -31,8 +31,6 @@ type DevDescription struct {
 var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
-	arm    = flag.Bool("a", false, "Arm (take care now)")
-	fs     = flag.Bool("fs", false, "Test failsafe")
 )
 
 func check_device() DevDescription {
@@ -148,6 +146,9 @@ func parse_device(devstr string) DevDescription {
 }
 
 func main() {
+	log.SetPrefix("[msp_set_rx] ")
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of msp_set_rx [options]\n")
 		flag.PrintDefaults()
@@ -160,6 +161,6 @@ func main() {
 		log.Fatalln("Mis-configured arm switch --- see README")
 	} else {
 		fmt.Printf("Arming set for channel %d / %dus\n", s.swchan+1, s.swvalue)
-		s.test_rx(*arm, *fs)
+		s.test_rx()
 	}
 }

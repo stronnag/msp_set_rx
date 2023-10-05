@@ -9,7 +9,7 @@ import (
 	"net"
 	"os"
 	"sort"
-	"time"
+	"strings"
 )
 
 const (
@@ -98,23 +98,26 @@ type ModeRange struct {
 }
 
 type MSPSerial struct {
-	klass   int
-	sd      SerDev
-	usev2   bool
-	bypass  bool
-	vcapi   uint16
-	fcvers  uint32
-	a       int8
-	e       int8
-	r       int8
-	t       int8
-	c0      chan SChan
-	swchan  int8
-	swvalue uint16
-	mranges []ModeRange
+	klass     int
+	sd        SerDev
+	usev2     bool
+	bypass    bool
+	vcapi     uint16
+	fcvers    uint32
+	a         int8
+	e         int8
+	r         int8
+	t         int8
+	c0        chan SChan
+	swchan    int8
+	swvalue   uint16
+	mranges   []ModeRange
+	arm_mask  uint64
+	fail_mask uint64
+	boxparts  []string
 }
 
-var nchan = int(16)
+var nchan = int(18)
 
 func crc8_dvb_s2(crc byte, a byte) byte {
 	crc ^= a
@@ -404,6 +407,9 @@ func MSPInit(dd DevDescription) *MSPSerial {
 				m.fcvers = uint32(v.data[0])<<16 | uint32(v.data[1])<<8 | uint32(v.data[2])
 				m.Send_msp(msp_BUILD_INFO, nil)
 				v6 = (v.data[0] >= 6)
+				if v.data[0] == 1 {
+					nchan = 16
+				}
 			case msp_BUILD_INFO:
 				gitrev = string(v.data[19:])
 				m.Send_msp(msp_BOARD_INFO, nil)
@@ -448,21 +454,18 @@ func MSPInit(dd DevDescription) *MSPSerial {
 					cmap[v.data[1]] = 'E'
 					cmap[v.data[2]] = 'R'
 					cmap[v.data[3]] = 'T'
-					fmt.Fprintf(os.Stderr, " map %s", cmap)
-				} else {
-					fmt.Fprintln(os.Stderr, "")
+					fmt.Fprintf(os.Stderr, "map: %s\n", cmap)
 				}
 				m.Send_msp(msp_NAME, nil)
 			case msp_NAME:
 				if v.len > 0 {
-					fmt.Fprintf(os.Stderr, " \"%s\"\n", v.data[:v.len])
-				} else {
-					fmt.Fprintln(os.Stderr, "")
+					fmt.Fprintf(os.Stderr, "name: \"%s\"\n", v.data[:v.len])
 				}
 				m.Send_msp(msp_BOXNAMES, nil)
 			case msp_BOXNAMES:
 				if v.len > 0 {
-					fmt.Fprintf(os.Stderr, "BOX: %s\n", v.data[:v.len])
+					fmt.Fprintf(os.Stderr, "box: %s\n", v.data[:v.len])
+					m.setup_box_masks(string(v.data))
 				} else {
 					fmt.Fprintln(os.Stderr, "No Boxen")
 				}
@@ -481,6 +484,35 @@ func MSPInit(dd DevDescription) *MSPSerial {
 	return m
 }
 
+func (m *MSPSerial) setup_box_masks(boxen string) {
+	m.boxparts = strings.Split(boxen, ";")
+	for i, b := range m.boxparts {
+		switch b {
+		case "ARM":
+			m.arm_mask = 1 << i
+		case "FAILSAFE":
+			m.fail_mask = 1 << i
+		default:
+		}
+	}
+}
+
+func (m *MSPSerial) format_box(bval uint64) string {
+	var sb strings.Builder
+	for i, b := range m.boxparts {
+		j := uint64(1 << i)
+		if (bval & j) != 0 {
+			sb.WriteString(b)
+			sb.WriteByte(',')
+		}
+	}
+	if sb.Len() == 0 {
+		return ""
+	} else {
+		return sb.String()[0 : sb.Len()-1]
+	}
+}
+
 /*
 	 for reference
 			   type ModeRange struct {
@@ -493,6 +525,9 @@ func MSPInit(dd DevDescription) *MSPSerial {
 func (m *MSPSerial) deserialise_modes(buf []byte) {
 	i := 0
 	for j := 0; j < MAX_MODE_ACTIVATION_CONDITION_COUNT; j++ {
+		if i >= len(buf) {
+			break
+		}
 		if buf[i+3] != 0 {
 			invalid := (buf[0] == PERM_ARM && (buf[i+3]-buf[i+2]) > 40)
 			if !invalid {
@@ -517,8 +552,7 @@ func (m *MSPSerial) deserialise_modes(buf []byte) {
 	}
 }
 
-func (m *MSPSerial) serialise_rx(phase int) []byte {
-	nchan = 18
+func (m *MSPSerial) serialise_rx(phase int, fs bool) []byte {
 	buf := make([]byte, nchan*2)
 	aoff := int(0)
 
@@ -539,6 +573,12 @@ func (m *MSPSerial) serialise_rx(phase int) []byte {
 		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(1001)) // a little clue as to the arm channel
 	}
 
+	baseval := uint16(1500)
+	if fs {
+		n := uint16(rand.Intn(rx_RAND))
+		baseval += (n - rx_RAND/2)
+	}
+
 	switch phase {
 	case PHASE_Unknown:
 		n := rand.Intn(rx_RAND)
@@ -550,8 +590,8 @@ func (m *MSPSerial) serialise_rx(phase int) []byte {
 		n = rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(990))
 	case PHASE_Quiescent:
-		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], baseval)
+		binary.LittleEndian.PutUint16(buf[m.e:ee], baseval)
 		if m.bypass {
 			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(2000))
 		} else {
@@ -560,8 +600,8 @@ func (m *MSPSerial) serialise_rx(phase int) []byte {
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 
 	case PHASE_Arming:
-		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], baseval)
+		binary.LittleEndian.PutUint16(buf[m.e:ee], baseval)
 		if m.bypass {
 			binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1999))
 		} else {
@@ -572,8 +612,8 @@ func (m *MSPSerial) serialise_rx(phase int) []byte {
 		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
 	case PHASE_LowThrottle:
-		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], baseval)
+		binary.LittleEndian.PutUint16(buf[m.e:ee], baseval)
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
 		thr := 1100 + rand.Intn(rx_RAND)
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(thr))
@@ -581,8 +621,8 @@ func (m *MSPSerial) serialise_rx(phase int) []byte {
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))
 		}
 	case PHASE_Disarming:
-		binary.LittleEndian.PutUint16(buf[m.a:ae], uint16(1500))
-		binary.LittleEndian.PutUint16(buf[m.e:ee], uint16(1500))
+		binary.LittleEndian.PutUint16(buf[m.a:ae], baseval)
+		binary.LittleEndian.PutUint16(buf[m.e:ee], baseval)
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
 		binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(999))
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(1000))
@@ -601,104 +641,4 @@ func deserialise_rx(b []byte) []int16 {
 		buf[j] = int16(binary.LittleEndian.Uint16(b[n : n+2]))
 	}
 	return buf
-}
-
-func (m *MSPSerial) test_rx(arm bool, fs bool) {
-	cnt := 0
-	var phase = PHASE_Unknown
-	var v SChan
-
-	for {
-		if arm {
-			if cnt <= 300 || cnt > 1510 {
-				phase = PHASE_Quiescent
-			} else if cnt > 1500 {
-				phase = PHASE_Disarming
-			} else if cnt > 310 {
-				phase = PHASE_LowThrottle
-			} else if cnt > 300 {
-				phase = PHASE_Arming
-			} else {
-				phase = PHASE_Unknown
-			}
-		}
-
-		infs := false
-		if fs && cnt > 399 && cnt < 500 {
-			fmt.Printf("Failsafe ")
-			infs = true
-		} else {
-			tdata := m.serialise_rx(phase)
-			m.Send_msp(msp_SET_RAW_RC, tdata)
-			v = <-m.c0
-			txdata := deserialise_rx(tdata)
-			fmt.Printf("Tx: %v\n", txdata)
-
-			m.Send_msp(msp_RC, nil)
-			v = <-m.c0
-			if v.cmd == msp_RC {
-				rxdata := deserialise_rx(v.data)
-				fmt.Printf("Rx: %v (%05d)", rxdata, cnt)
-			}
-		}
-		var stscmd uint16
-		if m.vcapi > 0x200 {
-			if m.fcvers >= 0x010801 {
-				stscmd = msp2_INAV_STATUS
-			} else {
-				stscmd = msp_STATUS_EX
-			}
-		} else {
-			stscmd = msp_STATUS
-		}
-		m.Send_msp(stscmd, nil)
-		v = <-m.c0
-		if v.ok {
-			var status uint64
-			if stscmd == msp2_INAV_STATUS {
-				status = binary.LittleEndian.Uint64(v.data[13:21])
-			} else {
-				status = uint64(binary.LittleEndian.Uint32(v.data[6:10]))
-			}
-
-			var armf uint32
-			armf = 0
-			if stscmd == msp_STATUS_EX {
-				armf = uint32(binary.LittleEndian.Uint16(v.data[13:15]))
-			} else {
-				armf = binary.LittleEndian.Uint32(v.data[9:13])
-			}
-
-			if infs {
-				fmt.Printf(" <%x> ", status)
-			}
-			if status&1 == 1 {
-				fmt.Print(" armed")
-				if armf > 12 {
-					fmt.Printf(" (%x)", armf)
-				}
-			} else {
-				if stscmd == msp_STATUS {
-					fmt.Print(" unarmed")
-				} else {
-					fmt.Printf(" unarmed (%x)", armf)
-				}
-			}
-		}
-
-		switch phase {
-		case PHASE_Unknown:
-			fmt.Printf("\n")
-		case PHASE_Quiescent:
-			fmt.Printf(" Quiescent\n")
-		case PHASE_Arming:
-			fmt.Printf(" Arming\n")
-		case PHASE_LowThrottle:
-			fmt.Printf(" Low throttle\n")
-		case PHASE_Disarming:
-			fmt.Printf(" Dis-arming\n")
-		}
-		time.Sleep(100 * time.Millisecond)
-		cnt++
-	}
 }

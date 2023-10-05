@@ -12,29 +12,32 @@ Well it does, if you do it right. This example demonstrates usage.
 
 As Go is available on pretty much any OS, you can easily verify that it works, with this small application.
 
+**NOTE: The previous, verbose version of this tool is now in the `legacy` branch, should you want to play with that**
+
 ## FC Prerequisites
 
-A supported FC
+* A supported FC
+* INAV v6 or later, earlier versions may work
 
 ```
 # Modern firmware (e.g INAV 1.8 and later)
 set receiver_type = MSP
 ```
 
-For older versions of this example, with INAV prior to INAV 1.8:
+For older versions of this example, with INAV prior to INAV 1.8, you can try:
 
 ```
 # for ancient firmware
 feature RX_MSP
 ```
 
-Note: `MSP_RC` assumes a "AERT" channel map. `MSP_SET_RAW_RC` honours the FC's channel map, so `msp_set_rx` uses the map set on the FC to send data, but always reports "AERT".
+However, don't be surprised if it fails.
 
-Update RX data at 5Hz or better.
-
-Consider also (post inav 2.1) custom firmware with `#define USE_MSP_RC_OVERRIDE` in `target/common.h` and enabling the MSP RC override flight mode. It is also advisable to `make <TARGET_clean>` when changing such defines.
-
-Note that as this tool can cause motors to run, the usual "don't be stupid / remove props / secure the vehicle" warnings apply.
+* The FC should have been configured to a state in which it can be armed:
+  - The sensors are calibrated
+  - Sensors are powered (e.g. GPS requiring battery)
+  - If necessary `nav_extra_arming_safety` may be set to `ALLOW_BYPASS`
+  - The arming channel is defined, with a range less than 1000
 
 ## Building
 
@@ -52,154 +55,115 @@ This should result in a `msp_set_rx` application.
 ```
 $ ./msp_set_rx --help
 Usage of msp_set_rx [options]
-  -a	Arm (take care now)
   -b int
     	Baud rate (default 115200)
   -d string
     	Serial Device
-  -fs
-    	Test failsafe
 ```
 
-Sets random (but safe-ish) values:
+When initialised, the application will accept keypresses:
+
+* 'A', 'a' : Toggle arming state
+ - If the FC is in a "ready to arm" condition, it will be armed
+ - If the FC is armed, disarm it
+* `Q`,`q`,`Ctrl-C` : Clean exit. If the FC is armed, it will be disarmed first.
+* `F`: Unclean exit, potentially causing fail-safe. Be prepared to handle the consequences.
+
+If the application is exited uncleanly, then on restarting `msp_set_rx`, the DFC should recover from fail-safe.
+
 
 ```
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
 # and hence, probably, for example
 C:\> msp_set_rx.exe -d COM42 -b 115200
 # Arm on switch set in CLI/configurator)
-$ ./msp_set_rx -a -d /dev/ttyACM0
+$ ./msp_set_rx # Linux, autodetect
 ```
 
 Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
 
-### Arm / Disarm test
-
-The application can also test arm / disarm, with the `-a` option. In this mode, the application:
-
-* Sets a quiescent state for 30 seconds
-* Arms using the configured switch
-* Maintains low-throttle (< 1300uS) for two minutes
-* Disarms (switch)
-
-**The vehicle must be in a state that will allow arming: [inav wiki article](https://github.com/iNavFlight/inav/wiki/%22Something%22-is-disabled----Reasons).**
-
-If `nav_extra_arming_safety = ALLOW_BYPASS` is set on the FC, it will be honoured to allow arming with bypass.
-
-Summary of output (`##` indicates a comment, repeated lines removed). 16 channels are reported (earlier versions displayed 8).
-
-Post 2020-01-11, shows armed status and iteration count, switch arming:
-
-```
-./msp_set_rx -a
-2020/01/12 10:13:46 Using device /dev/ttyACM0
-INAV v2.4.0 SPRACINGF3EVO (fa4e2426) API 2.4 "Evotest-V"
-## for the first 30 seconds
-Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
-Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (00000) unarmed Quiescent
-...
-## for 30 - 31 seconds
-Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00301) unarmed Arming
-Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00302) armed Arming
-...
-## for the next two minutes
-Tx: [1500 1500 1500 1000 2000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 2000 1442 1605 1669] (00311) armed Min throttle
-...
-## After 2 minutes & 30 seconds
-Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01501) armed Dis-arming
-Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01502) armed Dis-arming
-Tx: [1500 1500 1500 1000 1000 1442 1605 1669]
-Rx: [1500 1500 1500 1000 1000 1442 1605 1669] (01503) unarmed Dis-arming
-## After 2 minutes & 31 seconds
-Tx: [1500 1500 1500 1000 1001 1442 1605 1669]
-Rx: [1500 1500 1500 1000 1001 1442 1605 1669] (01511) unarmed Quiescent
-```
-Note that from 2020-04-22, in the disarmed state the arming status is displayed as a hex number, now using 32bit `MSP2_INAV_STATUS` where possible (after inav 1.8.1).:
-
-Real example .... using the INAV_SITL. Note that we send `AETR` (`MSP_SET_RAW_RC`) but checking with `MSP_RC` reports `AERT`.
-
-* Repetitive bits trimmed
-* 18 channels supported by `MSP_SET_RAW_RC`
-* Timers are used for arming / disarming. It is would also be possible to reduce the time in these transitions by using the status from `MSP2_INAV_STATUS`.
-
-```
-$ msp_set_rx -a -d tcp://localhost:5761
-2023/05/21 11:34:57 Using device localhost
-INAV v7.0.0 SITL (ca2202ea) API 2.5
-nav_extra_arming_safety: 1 (bypass true)
- map AETR "BENCHYMCTESTY"
-BOX: ARM;PREARM;ANGLE;HORIZON;TURN ASSIST;HEADING HOLD;CAMSTAB;NAV POSHOLD;LOITER CHANGE;NAV RTH;NAV WP;HOME RESET;GCS NAV;WP PLANNER;MISSION CHANGE;NAV CRUISE;NAV COURSE HOLD;SOARING;NAV ALTHOLD;MANUAL;NAV LAUNCH;SERVO AUTOTRIM;AUTO TUNE;AUTO LEVEL TRIM;BEEPER;BEEPER MUTE;OSD OFF;BLACKBOX;KILLSWITCH;FAILSAFE;CAMERA CONTROL 1;CAMERA CONTROL 2;CAMERA CONTROL 3;OSD ALT 1;OSD ALT 2;OSD ALT 3;
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00000) unarmed (40200) Quiescent
-...
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00003) unarmed (40200) Quiescent
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00004) unarmed (40000) Quiescent
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00005) unarmed (0) Quiescent
-...
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00300) unarmed (0) Quiescent
-Tx: [1500 1500 1000 1999 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1999 1000 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00301) unarmed (0) Arming
-Tx: [1500 1500 1000 1999 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1999 1000 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00302) armed Arming
-...
-Tx: [1500 1500 1000 1999 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1999 1000 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00310) armed Arming
-Tx: [1500 1500 1189 1500 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1189 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00311) armed Low throttle
-Tx: [1500 1500 1299 1500 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1299 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00312) armed Low throttle
-...
-Tx: [1500 1500 1284 1500 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1284 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (01500) armed Low throttle
-Tx: [1500 1500 1000 1500 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1000 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000] (01501) armed Dis-arming
-Tx: [1500 1500 1000 1500 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1000 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000] (01502) armed Dis-arming
-Tx: [1500 1500 1000 1500 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1000 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000] (01503) unarmed (8) Dis-arming
-...
-Tx: [1500 1500 1000 1500 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1000 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000] (01509) unarmed (8) Dis-arming
-Tx: [1500 1500 1000 1500 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1000 1000 1000 1000 1000 1000 999 1000 1000 1000 1000 1000 1000 1000 1000] (01510) unarmed (8) Dis-arming
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (01511) unarmed (8) Quiescent
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (01512) unarmed (8) Quiescent
-```
-
-| value | reason |
-| ---- | ---- |
-| 0x40000 | No RX link |
-| 0x200 | calibrating |
-
-which seems reasonable, RX not recognised until sensor calibration complete.
 
 While this tool attempts to arm at a safe throttle value, removing props or using a current limiter is recommended. Using the [INAV_SITL](https://github.com/iNavFlight/inav/blob/master/docs/SITL/SITL.md) is also a good option. A suitable configuration for such experiments is described in the [fl2sitl wiki](https://github.com/stronnag/bbl2kml/wiki/fl2sitl#sitl-configuration)
 
-### Data shown
+## Examples
+
+### Cold start
 
 ```
-Tx: [1500 1500 1000 2000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 2000 1000 1000 1000 1000 1000 1000 1001 1000 1000 1000 1000 1000 1000 1000 1000] (00003) unarmed (40200) Quiescent
+./msp_set_rx
+[msp_set_rx] 19:20:08.885594 Using device /dev/ttyACM0
+INAV v7.0.0 WINGFC (497c01eb) API 2.5
+nav_extra_arming_safety: 2 (bypass true)
+map: AETR
+name: "BENCHYMCTESTY"
+box: ARM;PREARM;MULTI FUNCTION;ANGLE;HORIZON;TURN ASSIST;HEADING HOLD;CAMSTAB;NAV POSHOLD;LOITER CHANGE;NAV RTH;NAV WP;NAV CRUISE;NAV COURSE HOLD;HOME RESET;GCS NAV;WP PLANNER;MISSION CHANGE;SOARING;NAV ALTHOLD;MANUAL;NAV LAUNCH;SERVO AUTOTRIM;AUTO TUNE;AUTO LEVEL TRIM;BEEPER;BEEPER MUTE;OSD OFF;BLACKBOX;KILLSWITCH;FAILSAFE;CAMERA CONTROL 1;CAMERA CONTROL 2;CAMERA CONTROL 3;OSD ALT 1;OSD ALT 2;OSD ALT 3;MIXER PROFILE 2;MIXER TRANSITION;
+chan:  5, start: 1300, end: 1700 NAV POSHOLD
+chan:  5, start: 1700, end: 2100 NAV RTH
+chan:  6, start: 1300, end: 2100 NAV WP
+chan:  7, start: 1700, end: 2100 NAV ALTHOLD
+chan:  7, start: 1700, end: 2100 NAV COURSE HOLD
+chan:  8, start: 1375, end: 1600 NAV LAUNCH
+chan: 10, start: 1500, end: 2100 ARM
+chan: 11, start: 1450, end: 2100 MANUAL
+chan: 12, start: 1600, end: 2100 BEEPER
+Arming set for channel 10 / 1800us
+[msp_set_rx] 19:20:09.101738 Start TX loop
+[msp_set_rx] 19:20:09.228487 Box: FAILSAFE (40000000) Arm: RCLink (0x40000)
+[msp_set_rx] 19:20:09.932720 Box:  (0) Arm: Ready to arm (0x0)
+```
+Depending on how early in the boot process you start `msp_set_rx`, you may also see some calibration messages.
+
+Having reached the "Ready to arm" state, if you press `A`, the FC will be armed:
+
+```
+[msp_set_rx] 19:31:55.324435 Box: ARM (1) Arm: Armed (0xc)
+```
+
+And if `A` is pressed again, the FC is disarmed:
+
+```
+[msp_set_rx] 19:33:36.633957 Box:  (0) Arm: Ready to arm (0x8)
+```
+
+Pressing `Q` or `Ctrl-C` will exit the application, if the FC is armed, it will be disarmed first.
+
+```
+$ ./msp_set_rx
 ...
-Tx: [1500 1500 1189 1500 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000]
-Rx: [1500 1500 1500 1189 1000 1000 1000 1000 1000 1800 1000 1000 1000 1000 1000 1000 1000 1000] (00311) armed Low throttle
+[msp_set_rx] 19:35:13.895771 Box:  (0) Arm: Ready to arm (0x8)
+######## Press 'A'
+[msp_set_rx] 19:35:15.191735 Box: ARM (1) Arm: Armed (0xc)
+######## Press `Q`
+[msp_set_rx] 19:35:17.895726 Box:  (0) Arm: Ready to arm (0x8)
+######## FC was automatically disarmed prior to exit
+$
 ```
-Pairs of transmitted `Tx:` and received `Rx:` data (`MSP_SET_RAW_RC` / `MSP_RC`). First four channels are,  for `Tx:` are according to the configured `map`, and for `Rx:` `AERT`. These are followed by followed by channels 5-18.
 
-The `Rx:` line also shows (first stanza) application timer (`00003` ((deciseconds)), arm state (`unarmed`), arming flags (`(40200`) and application mode (`Quiescent`). Where is arm state is just "Armed", the numeric value is not shown (last line).
+Use `F` key press to exit without diarming:
 
-#### arm_status
+```
+$ ./msp_set_rx
+...
+[msp_set_rx] 19:40:32.608377 Box:  (0) Arm: Ready to arm (0x8)
+[msp_set_rx] 19:40:34.000353 Box: ARM (1) Arm: Armed (0xc)
+######## Press `F`
+######## Immediate exit with disarming, we're in failsafe ...
+$
+```
+
+If we restart after failsafe:
+```
+$ ./msp_set_rx
+...
+[msp_set_rx] 19:40:59.297024 Start TX loop
+[msp_set_rx] 19:40:59.423609 Box: ARM,ANGLE,FAILSAFE (40000009) Arm: Armed (0xc)
+[msp_set_rx] 19:41:00.127562 Box: ARM (1) Arm: Armed (0xc)
+
+```
+
+Note the FC "Box" state shows `ARM,ANGLE,FAILSAFE`, and that we are armed. It then quickly recovers (0.5s, meeting the required 5Hz update rate) to a normal armed state, from which we can disarm /  quit cleanly.
+
+## arm_status
 
 There is a simple tool to interpret arming status `arm_status`. It accepts one or more numeric status codes and displays human readable interpretation:
 
@@ -216,10 +180,6 @@ Status 00084c00:
 ```
 
 Copy it onto `$PATH` if you wish.
-
-### Failsafe test
-
-If the failsafe mode is commanded (`-fs`), then no RC data is sent between 40s and 50s. This will cause the FS to enter failsafe for this period.
 
 ## Other examples
 
