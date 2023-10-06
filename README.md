@@ -211,20 +211,9 @@ Note that the SITL captures some of the early status / calibration changes. The 
 
 In one terminal (with `eeprom.bin` pre-configured for MSP receiver):
 ```
-inav_SITL --path /path/to/eeprom.bin --sim xp
+((fl2sitl --minimal&) && inav_SITL --path ~/sitl-eeproms/fw-eeprom.bin --sim xp)
 ```
-
-In another terminal:
-```
-fl2sitl -minimal
-```
-
-Or, more simply, just combine the above steps into:
-```
-(inav_SITL --path ~/sitl-eeproms/fw-eeprom.bin --sim xp &) ;  fl2sitl --minimal
-# don't forget to kill the inav_SITL when done
-```
-Then:
+Then (another terminal / tab):
 ```
 msp_set_rx -d tcp://localhost:5761
 ```
