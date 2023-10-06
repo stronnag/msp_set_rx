@@ -48,7 +48,7 @@ func (m *MSPSerial) find_status_cmd() (stscmd uint16) {
 	return stscmd
 }
 
-func (m *MSPSerial) test_rx(setthr int) {
+func (m *MSPSerial) test_rx(setthr int, verbose bool) {
 	phase := PHASE_Quiescent
 	stscmd := m.find_status_cmd()
 	fs := false
@@ -89,12 +89,24 @@ func (m *MSPSerial) test_rx(setthr int) {
 		case <-ticker.C:
 			tdata := m.serialise_rx(phase, setthr, fs)
 			m.Send_msp(msp_SET_RAW_RC, tdata)
-
+			if verbose {
+				txdata := deserialise_rx(tdata)
+				fmt.Printf("Tx: %v\n", txdata)
+			}
 		case v := <-m.c0:
 			if v.ok {
 				switch v.cmd {
 				case msp_SET_RAW_RC:
+					if verbose {
+						m.Send_msp(msp_RC, nil)
+					} else {
+						m.Send_msp(stscmd, nil)
+					}
+				case msp_RC:
+					rxdata := deserialise_rx(v.data)
+					fmt.Printf("Rx: %v\n", rxdata)
 					m.Send_msp(stscmd, nil)
+
 				case msp2_INAV_STATUS, msp_STATUS_EX, msp_STATUS:
 					boxflags, armflags := get_status(v)
 					// Unarmed, able to arm

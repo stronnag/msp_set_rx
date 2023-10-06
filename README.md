@@ -60,6 +60,8 @@ Usage of msp_set_rx [options]
     	Serial Device
   -throttle int
     	Low throttle (µs) (default -1)
+  -verbose
+    	log Rx/Tx stanzas
 ```
 
 When initialised, the application will accept keypresses:
