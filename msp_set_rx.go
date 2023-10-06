@@ -31,6 +31,7 @@ type DevDescription struct {
 var (
 	baud   = flag.Int("b", 115200, "Baud rate")
 	device = flag.String("d", "", "Serial Device")
+	setthr = flag.Int("throttle", -1, "Low throttle (µs)")
 )
 
 func check_device() DevDescription {
@@ -161,6 +162,6 @@ func main() {
 		log.Fatalln("Mis-configured arm switch --- see README")
 	} else {
 		fmt.Printf("Arming set for channel %d / %dus\n", s.swchan+1, s.swvalue)
-		s.test_rx()
+		s.test_rx(*setthr)
 	}
 }

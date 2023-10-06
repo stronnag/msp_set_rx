@@ -552,7 +552,7 @@ func (m *MSPSerial) deserialise_modes(buf []byte) {
 	}
 }
 
-func (m *MSPSerial) serialise_rx(phase int, fs bool) []byte {
+func (m *MSPSerial) serialise_rx(phase int, setthr int, fs bool) []byte {
 	buf := make([]byte, nchan*2)
 	aoff := int(0)
 
@@ -615,7 +615,12 @@ func (m *MSPSerial) serialise_rx(phase int, fs bool) []byte {
 		binary.LittleEndian.PutUint16(buf[m.a:ae], baseval)
 		binary.LittleEndian.PutUint16(buf[m.e:ee], baseval)
 		binary.LittleEndian.PutUint16(buf[m.r:re], uint16(1500))
-		thr := 1100 + rand.Intn(rx_RAND)
+		thr := uint16(0)
+		if setthr < 1000 {
+			thr = uint16(1100 + rand.Intn(rx_RAND))
+		} else {
+			thr = uint16(setthr)
+		}
 		binary.LittleEndian.PutUint16(buf[m.t:te], uint16(thr))
 		if aoff != 0 {
 			binary.LittleEndian.PutUint16(buf[aoff:aoff+2], uint16(m.swvalue))

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This golang program exercises `MSP_SET_RAW_RC`.
+This golang program exercises `MSP_SET_RAW_RC`. This is intended to be a learning / experimental / educational tool rather than an end user application.
 
 ### Why
 
@@ -52,23 +52,29 @@ This should result in a `msp_set_rx` application.
 ## Usage
 
 ```
-$ ./msp_set_rx --help
+$ msp_set_rx --help
 Usage of msp_set_rx [options]
   -b int
     	Baud rate (default 115200)
   -d string
     	Serial Device
+  -throttle int
+    	Low throttle (µs) (default -1)
 ```
 
 When initialised, the application will accept keypresses:
 
-* 'A', 'a' : Toggle arming state
- - If the FC is in a "ready to arm" condition, it will be armed
- - If the FC is armed, disarm it
+* `A`, `a` : Toggle arming state
+  - If the FC is in a "ready to arm" condition, it will be armed
+  - If the FC is armed, it will be disarmed
 * `Q`,`q`,`Ctrl-C` : Clean exit. If the FC is armed, it will be disarmed first.
 * `F`: Unclean exit, potentially causing fail-safe. Be prepared to handle the consequences.
 
-If the application is exited uncleanly, then on restarting `msp_set_rx`, the FC should recover from fail-safe (note we perturb roll and pitch to force recovery).
+If a `-throttle` value has been set, then, when armed it will run the motors at that value and the throttle will not be randomly perturbed. Two additional keypresses are recognised:
+
+* `+`, `-` raise / lower throttle by 25µs
+
+If the application is exited uncleanly, then on restarting `msp_set_rx`, the FC should recover from fail-safe (note roll and pitch are perturbed to force recovery).
 
 ```
 $ ./msp_set_rx -d /dev/ttyUSB0 [-b baud]
@@ -82,7 +88,7 @@ Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
 
 While this tool attempts to arm at a safe throttle value, removing props or using a current limiter is recommended. Using the [INAV_SITL](https://github.com/iNavFlight/inav/blob/master/docs/SITL/SITL.md) is also a good option. A suitable configuration for such experiments is described in the [fl2sitl wiki](https://github.com/stronnag/bbl2kml/wiki/fl2sitl#sitl-configuration)
 
-Please also note that when armed, the motors will run at randomly changing throttle between 1100us and 1300us. Please ensure you and your hardware are content with this.
+Please also note that if you do not define a "low throttle" (`-throttle`) value, then when armed, the motors will run at randomly changing throttle between 1100us and 1300us. Please ensure you and your hardware are content with this.
 
 ## Examples
 
@@ -114,13 +120,11 @@ Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe
 Depending on how early in the boot process you start `msp_set_rx`, you may also see some calibration messages.
 
 Having reached the "Ready to arm" state, if you press `A`, the FC will be armed:
-
 ```
 [msp_set_rx] 19:31:55.324435 Box: ARM (1) Arm: Armed (0xc)
 ```
 
 And if `A` is pressed again, the FC is disarmed:
-
 ```
 [msp_set_rx] 19:33:36.633957 Box:  (0) Arm: Ready to arm (0x8)
 ```
@@ -168,7 +172,7 @@ Note the FC "Box" state shows `ARM,ANGLE,FAILSAFE`, and that we are still armed.
 You can also use the INAV SITL to test. This has the advantage of not requiring hardware. The same arming prerequisites apply.
 
 ```
-$ ./msp_set_rx -d tcp://localhost:5761
+$ ./msp_set_rx -d tcp://localhost:5761 -throttle 1200
 [msp_set_rx] 21:09:56.436998 Using device localhost
 INAV v7.0.0 SITL (3a2412e5) API 2.5
 nav_extra_arming_safety: 2 (bypass true)
@@ -186,6 +190,7 @@ chan: 11, start: 1450, end: 2100 MANUAL
 chan: 12, start: 1600, end: 2100 BEEPER
 Arming set for channel 10 / 1800us
 Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe
+            '+'/'-' raise / lower throttle by 25µs
 [msp_set_rx] 21:09:57.497876 Start TX loop
 [msp_set_rx] 21:09:57.599109 Box: MANUAL,FAILSAFE (40100000) Arm: Calibrate RCLink (0x40220)
 [msp_set_rx] 21:09:58.299169 Box: MANUAL (100000) Arm: Calibrate (0x220)
@@ -193,27 +198,28 @@ Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe
 [msp_set_rx] 21:10:23.699638 Box: ARM (1) Arm: Armed (0x2c)
 [msp_set_rx] 21:10:30.099620 Box:  (0) Arm: Ready to arm (0x28)
 [msp_set_rx] 21:10:31.598849 Box: ARM (1) Arm: Armed (0x2c)
+Throttle: 1225
+Throttle: 1250
+Throttle: 1225
+Throttle: 1200
+Throttle: 1175
 [msp_set_rx] 21:10:35.299420 Box:  (0) Arm: Ready to arm (0x28)
 ```
-
-Note that the SITL captures some of the early status / calibration changes.
+Note that the SITL captures some of the early status / calibration changes. The /- keys are used to manually change the throttle value.
 
 #### SITL usage
 
 In one terminal (with `eeprom.bin` pre-configured for MSP receiver):
-
 ```
 inav_SITL --path /path/to/eeprom.bin --sim xp
 ```
 
 In another terminal:
-
 ```
 fl2sitl -minimal
 ```
 
 Then:
-
 ```
 msp_set_rx -d tcp://localhost:5761
 ```

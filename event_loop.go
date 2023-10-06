@@ -48,7 +48,7 @@ func (m *MSPSerial) find_status_cmd() (stscmd uint16) {
 	return stscmd
 }
 
-func (m *MSPSerial) test_rx() {
+func (m *MSPSerial) test_rx(setthr int) {
 	phase := PHASE_Quiescent
 	stscmd := m.find_status_cmd()
 	fs := false
@@ -77,6 +77,9 @@ func (m *MSPSerial) test_rx() {
 	signal.Notify(cc, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	fmt.Println("Keypresses: 'A'/'a': toggle arming, 'Q'/'q': quit, 'F': quit to failsafe")
+	if setthr > 999 && setthr < 2001 {
+		fmt.Println("            '+'/'-' raise / lower throttle by 25µs")
+	}
 	log.Printf("Start TX loop")
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -84,7 +87,7 @@ func (m *MSPSerial) test_rx() {
 	for done := false; done == false; {
 		select {
 		case <-ticker.C:
-			tdata := m.serialise_rx(phase, fs)
+			tdata := m.serialise_rx(phase, setthr, fs)
 			m.Send_msp(msp_SET_RAW_RC, tdata)
 
 		case v := <-m.c0:
@@ -132,6 +135,20 @@ func (m *MSPSerial) test_rx() {
 				done = true
 			case 'Q', 'q':
 				phase, done, dpending = safe_quit(phase)
+			case '+', '-':
+				if setthr > 999 && setthr < 2001 {
+					if ev == '+' {
+						setthr += 25
+					} else {
+						setthr -= 25
+					}
+					if setthr > 2000 {
+						setthr = 2000
+					} else if setthr < 1000 {
+						setthr = 1000
+					}
+					fmt.Printf("Throttle: %d\n", setthr)
+				}
 			}
 		case <-cc:
 			log.Println("Interrupt")
