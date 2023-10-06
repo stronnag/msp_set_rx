@@ -219,6 +219,11 @@ In another terminal:
 fl2sitl -minimal
 ```
 
+Or, more simply, just combine the above steps into:
+```
+(inav_SITL --path ~/sitl-eeproms/fw-eeprom.bin --sim xp &) ;  fl2sitl --minimal
+# don't forget to kill the inav_SITL when done
+```
 Then:
 ```
 msp_set_rx -d tcp://localhost:5761
