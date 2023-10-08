@@ -29,10 +29,11 @@ type DevDescription struct {
 }
 
 var (
-	baud    = flag.Int("b", 115200, "Baud rate")
-	device  = flag.String("d", "", "Serial Device")
-	setthr  = flag.Int("throttle", -1, "Low throttle (µs)")
-	verbose = flag.Bool("verbose", false, "log Rx/Tx stanzas")
+	baud     = flag.Int("b", 115200, "Baud rate")
+	device   = flag.String("d", "", "Serial Device")
+	setthr   = flag.Int("throttle", -1, "Low throttle (µs)")
+	verbose  = flag.Bool("verbose", false, "log Rx/Tx stanzas")
+	auto_arm = flag.Bool("auto-arm", false, "Auto-arm FC when ready")
 )
 
 func check_device() DevDescription {
@@ -163,6 +164,6 @@ func main() {
 		log.Fatalln("Mis-configured arm switch --- see README")
 	} else {
 		fmt.Printf("Arming set for channel %d / %dus\n", s.swchan+1, s.swvalue)
-		s.test_rx(*setthr, *verbose)
+		s.test_rx(*setthr, *verbose, *auto_arm)
 	}
 }

@@ -48,7 +48,7 @@ func (m *MSPSerial) find_status_cmd() (stscmd uint16) {
 	return stscmd
 }
 
-func (m *MSPSerial) test_rx(setthr int, verbose bool) {
+func (m *MSPSerial) test_rx(setthr int, verbose bool, autoarm bool) {
 	phase := PHASE_Quiescent
 	stscmd := m.find_status_cmd()
 	fs := false
@@ -91,7 +91,7 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool) {
 			m.Send_msp(msp_SET_RAW_RC, tdata)
 			if verbose {
 				txdata := deserialise_rx(tdata)
-				fmt.Printf("Tx: %v\n", txdata)
+				log.Printf("Tx: %v\n", txdata)
 			}
 		case v := <-m.c0:
 			if v.ok {
@@ -104,24 +104,26 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool) {
 					}
 				case msp_RC:
 					rxdata := deserialise_rx(v.data)
-					fmt.Printf("Rx: %v\n", rxdata)
+					log.Printf("Rx: %v\n", rxdata)
 					m.Send_msp(stscmd, nil)
 
 				case msp2_INAV_STATUS, msp_STATUS_EX, msp_STATUS:
 					boxflags, armflags := get_status(v)
-					// Unarmed, able to arm
 					if boxflags != xboxflags || xarmflags != armflags {
 						log.Printf("Box: %s (%x) Arm: %s\n", m.format_box(boxflags), boxflags, arm_status(armflags))
 						fs = ((boxflags & m.fail_mask) == m.fail_mask)
-						if (boxflags&m.arm_mask == 0) && armflags < 0x80 {
-							phase = PHASE_Quiescent
-						}
-
-						if (boxflags & m.arm_mask) == 0 { // Disarmed
-							phase = PHASE_Quiescent
-							done = dpending
-						} else {
-							phase = PHASE_LowThrottle // Armed
+						if boxflags&m.arm_mask == 0 { // not armed
+							if armflags < 0x80 { // ready to arm
+								if autoarm {
+									phase = PHASE_Arming
+									autoarm = false
+								} else {
+									phase = PHASE_Quiescent
+									done = dpending
+								}
+							}
+						} else { // Armed
+							phase = PHASE_LowThrottle
 						}
 						xboxflags = boxflags
 						xarmflags = armflags
@@ -138,14 +140,18 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool) {
 			case 'A', 'a':
 				switch phase {
 				case PHASE_Quiescent:
+					log.Println("Arming commanded")
 					phase = PHASE_Arming
 				case PHASE_LowThrottle:
+					log.Println("Disarming commanded")
 					phase = PHASE_Disarming
 				default:
 				}
 			case 'F':
+				log.Println("Exit to F/S commanded")
 				done = true
 			case 'Q', 'q':
+				log.Println("Quit commanded")
 				phase, done, dpending = safe_quit(phase)
 			case '+', '-':
 				if setthr > 999 && setthr < 2001 {
@@ -159,7 +165,7 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool) {
 					} else if setthr < 1000 {
 						setthr = 1000
 					}
-					fmt.Printf("Throttle: %d\n", setthr)
+					log.Printf("Throttle commanded: %d\n", setthr)
 				}
 			}
 		case <-cc:
