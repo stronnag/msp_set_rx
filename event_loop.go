@@ -153,6 +153,8 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool, autoarm bool) {
 			case 'Q', 'q':
 				log.Println("Quit commanded")
 				phase, done, dpending = safe_quit(phase)
+			case 'v', 'V':
+				verbose = !verbose
 			case '+', '-':
 				if setthr > 999 && setthr < 2001 {
 					if ev == '+' {

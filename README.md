@@ -73,6 +73,7 @@ When initialised, the application will accept keypresses:
   - If the FC is armed, it will be disarmed
 * `Q`,`q`,`Ctrl-C` : Clean exit. If the FC is armed, it will be disarmed first.
 * `F`: Unclean exit, potentially causing fail-safe. Be prepared to handle the consequences.
+* `v`, `V`: Toggle verbose
 
 If a `-throttle` value has been specified, then, when armed it will run the motors at that value and the throttle will not be randomly perturbed. Two additional keypresses are recognised:
 
