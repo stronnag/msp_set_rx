@@ -22,7 +22,7 @@ As Go is available on pretty much any OS, you can even verify that it works, wit
   - The sensors are calibrated
   - Required sensors are powered (e.g. GPS requiring battery)
   - If necessary `nav_extra_arming_safety` may be set to `ALLOW_BYPASS`
-  - The arming channel is defined, with a range less than 1000
+  - The arming channel is defined, with a range (min-max) less than 1000
 
 ### Set the correct RX type
 
@@ -43,11 +43,21 @@ However, don't be surprised if ancient versions fail to work with `msp_set_rx`.
 * Clone this repository
 * Build the test application
 
+### POSIX (*BSD, Linux, macOS) platforms
  ```
- make
+# gmake on 'BSD
+make
  ```
 
 This should result in a `msp_set_rx` application.
+
+### Windows
+
+For Windows (cross compile on non-Windows:)
+```
+GOOS=windows go build -ldflags "-w -s" -o msp_set_rx.exe msp.go msp_set_rx.go btaddr_other.go inav_misc.go event_loop.go
+```
+Natively, drop the `GOOS=windows` bit. With msys2, you can (probably) use the Makefile.
 
 ## Usage
 
@@ -222,7 +232,7 @@ Note that the SITL captures some of the early status / calibration changes.
 
 * Configure two MSP ports, one can be used for the MSP RX, the other to inspect the RX channels in the configurator.
 
-In one terminal (with `eeprom.bin` pre-configured for MSP receiver):
+In one terminal (with `eeprom.bin` pre-configured for MSP receiver), POSIXally at least:
 ```
 ((fl2sitl --minimal&) && inav_SITL --path ~/sitl-eeproms/fw-eeprom.bin --sim xp)
 ```
