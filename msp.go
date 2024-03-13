@@ -308,8 +308,13 @@ func (m *MSPSerial) Read_msp(c0 chan SChan) {
 			} else {
 				fmt.Fprintln(os.Stderr, "serial EOF")
 			}
+
+			sc.ok = false
+			sc.len = 0
+			sc.cmd = 0xffff
+			c0 <- sc
 			m.sd.Close()
-			os.Exit(2)
+			break
 		}
 	}
 }
@@ -436,7 +441,7 @@ func MSPInit(dd DevDescription) *MSPSerial {
 					if v6 {
 						bystr++
 					}
-					if bystr != 0 {
+					if bystr == 2 {
 						m.bypass = true
 					}
 					fmt.Printf("%s: %d (bypass %v)\n", SETTING_STR, bystr, m.bypass)
