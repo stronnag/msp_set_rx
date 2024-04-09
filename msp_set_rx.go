@@ -31,6 +31,7 @@ type DevDescription struct {
 var (
 	baud     = flag.Int("b", 115200, "Baud rate")
 	device   = flag.String("d", "", "Serial Device")
+	every    = flag.Int("every", 100, "Refresh time (ms)")
 	setthr   = flag.Int("throttle", -1, "Low throttle (µs)")
 	verbose  = flag.Bool("verbose", false, "log Rx/Tx stanzas")
 	auto_arm = flag.Bool("auto-arm", false, "Auto-arm FC when ready")

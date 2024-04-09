@@ -82,7 +82,7 @@ func (m *MSPSerial) test_rx(setthr int, verbose bool, autoarm bool) {
 	}
 	log.Printf("Start TX loop")
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(*every) * time.Millisecond)
 
 	for done := false; done == false; {
 		select {

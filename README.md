@@ -70,6 +70,8 @@ Usage of msp_set_rx [options]
     	Baud rate (default 115200)
   -d string
     	Serial Device
+  -every int
+    	Refresh time (ms) (default 100)
   -throttle int
     	Low throttle (µs) (default -1)
   -verbose
@@ -104,6 +106,11 @@ Note: On Linux, `/dev/ttyUSB0` and `/dev/ttyACM0` are automatically detected.
 While this tool attempts to arm at a safe throttle value, removing props or using a current limiter is recommended. Using the [INAV_SITL](https://github.com/iNavFlight/inav/blob/master/docs/SITL/SITL.md) may be a better option. A suitable configuration for such experiments is described in the [fl2sitl wiki](https://github.com/stronnag/bbl2kml/wiki/fl2sitl#sitl-configuration)
 
 Please also note that if you do not define a "low throttle" (`-throttle`) value, then when armed, the motors will run at randomly changing throttle between 1100us and 1300us. Please ensure you and your hardware are content with this.
+
+By default, the RC values are refreshed every 100ms (10Hz), twice the required minimum refresh rate. With `-every 200`, then RC values are updated every 200ms (5Hz). This should not failsafe, however any value greater than 200 will failsafe.
+
+* `-every 200` : works
+* `-every 201` : never comes out of failsafe.
 
 ## Examples
 
