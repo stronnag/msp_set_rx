@@ -197,7 +197,7 @@ func arm_status(status uint32) string {
 		"Ever armed", /*      8 */
 		"",           /*     10 */ // HITL
 		"",           /*     20 */ // SITL
-		"",           /*     40 */
+		"Geozone",    /*     40 */
 		"F/S",        /*     80 */
 		"Level",      /*    100 */
 		"Calibrate",  /*    200 */
@@ -209,7 +209,7 @@ func arm_status(status uint32) string {
 	}
 
 	var sarry []string
-	if status < 0x80 {
+	if status < 0x40 {
 		if status&(1<<2) != 0 {
 			sarry = append(sarry, armfails[2])
 		}

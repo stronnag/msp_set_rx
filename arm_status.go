@@ -12,12 +12,12 @@ func main() {
 		"Ever Armed",
 		"HITL",
 		"SITL",
-		"",
+		"Geozone",
 		"Failsafe", "Not level", "Calibrating", "Overload",
 		"Navigation unsafe", "Compass cal", "Acc cal", "Arm switch", "Hardware failure",
 		"Box failsafe", "Box killswitch", "RC Link", "Throttle", "CLI",
 		"CMS Menu", "OSD Menu", "Roll/Pitch", "Servo Autotrim", "Out of memory",
-		"Settings", "PWM Output", "PreArm", "DSHOTBeeper", "Other"}
+		"Settings", "PWM Output", "PreArm", "DSHOTBeeper", "Landing", "Other"}
 
 	if len(os.Args) > 1 {
 		for _, a := range os.Args[1:] {
