@@ -1,4 +1,8 @@
-# MSP_SET_RAW RC "considered harmful?"
+# Moved to [CODEBERG](https://codeberg.org/stronnag/msp_set_rx)
+
+This repo is obsolete, please use the [codeberg.org](https://codeberg.org/stronnag/msp_set_rx) repo.
+
+## MSP_SET_RAW RC "considered harmful?"
 
 ## Overview
 
